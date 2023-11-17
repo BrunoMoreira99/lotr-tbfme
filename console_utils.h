@@ -1,5 +1,4 @@
-#ifndef CONSOLE_UTILS_H
-#define CONSOLE_UTILS_H
+#pragma once
 
 typedef enum {
     WHITE = 0xFFFFFF,
@@ -43,5 +42,3 @@ static inline void hideCursor(void) {
 static inline void resetCursorPosition(void) {
     printf("\x1B[H");
 }
-
-#endif // CONSOLE_UTILS_H
