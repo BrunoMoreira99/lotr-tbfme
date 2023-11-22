@@ -11,6 +11,13 @@ void enableVirtualTerminalProcessing(void) {
     if (GetConsoleMode(hConsole, &dwMode)) SetConsoleMode(hConsole, dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 }
 
+void setupConsole(void) {
+    enableVirtualTerminalProcessing();
+    // Set the console's input and output code page to UTF-8.
+    SetConsoleCP(CP_UTF8);
+    SetConsoleOutputCP(CP_UTF8);
+}
+
 void setForegroundColor(const int color) {
     const int r = color >> 16 & 0xFF;
     const int g = color >> 8 & 0xFF;

@@ -2,11 +2,11 @@
 
 typedef enum {
     WHITE = 0xFFFFFF,
-    RED = 231 << 16 | 72 << 8 | 86, // 0xE74856
+    RED = 231 << 16 | 72 << 8 | 86 // 0xE74856
     // TODO: Add more colors.
 } Color;
 
-void enableVirtualTerminalProcessing(void);
+void setupConsole(void);
 int getCursorPosition(void);
 int getConsoleDimensions(void);
 int getConsoleWidth(void);
