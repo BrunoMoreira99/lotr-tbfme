@@ -7,18 +7,11 @@
 #include <windows.h>
 
 #include "console_utils.h"
+#include "ui_io_utils.h"
 #include "game.h"
 
-typedef struct {
-    const char* text;
-    const uint16_t consoleRow;
-} MenuOption;
 
-uint8_t openMainMenu(uint8_t currentSelection);
-
-void printCenteredText(const char* str) {
-    printf("\x1B[%dG%s", (getConsoleWidth() - (int)strlen(str)) / 2, str);
-}
+int8_t openMainMenu(int8_t currentSelection);
 
 inline void printTitle(void) {
     const char* asciiArt[] = {
@@ -42,59 +35,214 @@ inline void printTitle(void) {
     printCenteredText("THE BATTLE FOR MIDDLE-EARTH");
 }
 
-void openGameSetupSinglePlayer(void) {
-    // TODO: Implement Single Player mode.
+int loadMapList(char*** mapList) {
+    FILE *fp = fopen("Maps\\MapList.data", "r");
+    if (fp == NULL) return 0;
+    char *firstLine = fReadLine(fp);
+    int mapCount = strtol(firstLine, NULL, 10);
+    free(firstLine);
+    *mapList = malloc(mapCount * sizeof(char*));
+    for (int i = 0; i < mapCount; i++) {
+        char *mapName = fReadLine(fp);
+        char* mapFileName = malloc(10 + strlen(mapName) * sizeof(char));
+        (void)sprintf(mapFileName, "Maps\\%s.map", mapName);
+        FILE *mapFile = fopen(mapFileName, "r");
+        free(mapFileName);
+        if (mapFile == NULL) {
+            free(mapName);
+            // Check if the map file exists.
+            --mapCount;
+            --i;
+            continue;
+        }
+        (void)fclose(mapFile);
+        (*mapList)[i] = mapName;
+    }
+    (void)fclose(fp);
+    return mapCount;
 }
 
-void openGameSetupMultiPlayer(void) {
-    const uint16_t consoleWidth = getConsoleWidth();
+void drawMapPreview(const char* mapName, const uint16_t row, const uint16_t column) {
+    setCursorVerticalHorizontalPosition(row, column);
+    char* mapFileName = malloc(10 + strlen(mapName) * sizeof(char));
+    (void)sprintf(mapFileName, "Maps\\%s.map", mapName);
+    FILE *fp = fopen(mapFileName, "r");
+    if (fp == NULL) return;
+    int ch;
+    uint16_t r = 0;
+    uint8_t player = 0;
+    setForegroundColor(BLACK);
+    while ((ch = fgetc(fp)) != EOF) {
+        if (ch == '\n') {
+            setCursorVerticalHorizontalPosition(++r + row, column);
+            continue;
+        }
+        switch (ch) {
+            case 'P':
+                setBackgroundColor(C_PLAIN);
+                break;
+            case 'F':
+                setBackgroundColor(C_FOREST);
+                break;
+            case 'M':
+                setBackgroundColor(C_MOUNTAIN);
+                break;
+            case 'R':
+                setBackgroundColor(C_RIVER);
+                break;
+            case 'W':
+                setBackgroundColor(C_WATER);
+                break;
+            case 'B':
+                setBackgroundColor(C_BRIDGE);
+                break;
+            case 'S':
+                setBackgroundColor(C_SNOW);
+                break;
+            case 'L':
+                setBackgroundColor(C_LAVA);
+                break;
+            case '#':
+                printf("\b\bP%d", ++player);
+                continue;
+            default:
+                resetBackgroundColor();
+                break;
+        }
+        printf("  ");
+    }
+    (void)fclose(fp);
+    resetBackgroundColor();
+    resetForegroundColor();
+}
+
+char* openMapSelector(void) {
+    char **mapList;
+    const int mapCount = loadMapList(&mapList);
+    if (!mapCount) return NULL;
+    int currentSelection = 0;
+    if (mapCount > 1) {
+        const uint16_t consoleWidth = getConsoleWidth();
+        const uint16_t consoleHeight = getConsoleHeight();
+        clearConsole();
+        setForegroundColor(RED);
+        drawFullWidthBoxTitle("Map Selector");
+        for (uint16_t i = 5; i <= consoleHeight ; i++) {
+            setCursorVerticalHorizontalPosition(i, 2);
+            printf("┃");
+        }
+        const uint16_t mapPreviewPosRow = (consoleHeight - 19) / 2 + 1;
+        const uint16_t mapPreviewPosColumn = consoleWidth - consoleWidth / 4 - 26;
+        setCursorVerticalHorizontalPosition(mapPreviewPosRow - 1, mapPreviewPosColumn - 1);
+        drawBoldBox(54, 19);
+        setForegroundColor(WHITE);
+        drawMapPreview(mapList[0], mapPreviewPosRow, mapPreviewPosColumn);
+        setCursorVerticalHorizontalPosition(5, 4);
+        printf("> %s", mapList[0]);
+        setForegroundColor(RED);
+        for (int i = 1; i < mapCount; i++) {
+            setCursorVerticalHorizontalPosition(5 + (uint16_t)i * 2, 4);
+            printf("  %s", mapList[i]);
+        }
+        int ch;
+        do {
+            ch = _getch();
+            const int previousSelection = currentSelection;
+            if (ch == 0 || ch == 224) {
+                switch (_getch()) {
+                    case 72: // Up Arrow
+                        --currentSelection;
+                        break;
+                    case 80: // Down Arrow
+                        ++currentSelection;
+                        break;
+                }
+                currentSelection = (currentSelection + mapCount) % mapCount;
+            }
+            if (currentSelection == previousSelection) continue;
+            setCursorVerticalHorizontalPosition(5 + (uint16_t)previousSelection * 2, 4);
+            setForegroundColor(RED);
+            printf("  %s", mapList[previousSelection]);
+            setCursorVerticalHorizontalPosition(5 + (uint16_t)currentSelection * 2, 4);
+            setForegroundColor(WHITE);
+            printf("> %s", mapList[currentSelection]);
+            drawMapPreview(mapList[currentSelection], mapPreviewPosRow, mapPreviewPosColumn);
+            setForegroundColor(RED);
+        } while (ch != 13 && ch != 32); // Pressing Enter (13) or Space (32) will exit the loop.
+    }
+    char* chosenMapFile = malloc(10 + strlen(mapList[currentSelection]) * sizeof(char));
+    (void)sprintf(chosenMapFile, "Maps\\%s.map", mapList[currentSelection]);
+    for (int i = 0; i < mapCount; i++) {
+        free(mapList[i]);
+    }
+    free(mapList);
+    return chosenMapFile;
+}
+
+void openGameSetupSinglePlayer(void) {
     const uint16_t consoleHeight = getConsoleHeight();
     clearConsole();
     setForegroundColor(RED);
-    for (uint16_t i = 1; i <= consoleHeight ; i++) {
+    drawFullWidthBoxTitle("Player Setup");
+    for (uint16_t i = 5; i <= consoleHeight ; i++) {
         setCursorVerticalHorizontalPosition(i, 2);
         printf("┃");
     }
-    setCursorVerticalHorizontalPosition(1, 4);
-    printf("Player Setup");
-    setCursorVerticalHorizontalPosition(2, 2);
-    printf("┣");
-    for (uint16_t i = 3; i <= consoleWidth ; i++) {
-        printf("━");
+    showCursor();
+    char playerName[20];
+    setCursorVerticalHorizontalPosition(5, 4);
+    printf("Enter your name: ");
+    setForegroundColor(WHITE);
+    readLine(playerName, 20, false);
+    hideCursor();
+    char* chosenMapFile = openMapSelector();
+    clearConsole();
+    startNewSinglePlayerGame(chosenMapFile, playerName, false);    
+}
+
+void openGameSetupMultiPlayer(void) {
+    const uint16_t consoleHeight = getConsoleHeight();
+    clearConsole();
+    setForegroundColor(RED);
+    drawFullWidthBoxTitle("Player Setup");
+    for (uint16_t i = 5; i <= consoleHeight ; i++) {
+        setCursorVerticalHorizontalPosition(i, 2);
+        printf("┃");
     }
     showCursor();
     char player1Name[20], player2Name[20];
-    setCursorVerticalHorizontalPosition(4, 4);
+    setCursorVerticalHorizontalPosition(5, 4);
     printf("Player 1 Name: ");
     setForegroundColor(WHITE);
     readLine(player1Name, 20, false);
-    setCursorVerticalHorizontalPosition(5, 4);
+    setCursorVerticalHorizontalPosition(6, 4);
     setForegroundColor(RED);
     printf("Player 2 Name: ");
     setForegroundColor(WHITE);
     readLine(player2Name, 20, false);
     hideCursor();
+    char* chosenMapFile = openMapSelector();
     clearConsole();
-    startNewMultiplayerGame(player1Name, player2Name, false);    
+    startNewMultiplayerGame(chosenMapFile, player1Name, player2Name, false);    
 }
 
-uint8_t openGameSetup(uint8_t currentSelection) {
+int8_t openGameSetup(int8_t currentSelection) {
     const uint32_t currentConsoleDimensions = getConsoleDimensions();
     const uint16_t consoleWidth = currentConsoleDimensions & 0xFFFF;
     const uint16_t consoleMidRow = (currentConsoleDimensions >> 16 & 0xFFFF) / 2;
     const MenuOption menuOptions[] = {
-        {"Single Player (vs CPU)", consoleMidRow - 2},
-        {"Multiplayer (2 Players)", consoleMidRow},
-        {"Back", consoleMidRow + 3},
+        {"Single Player (vs CPU)", consoleMidRow - 2, 0},
+        {"Multiplayer (2 Players)", consoleMidRow, 0},
+        {"Back", consoleMidRow + 3, 0},
     };
     clearConsole();
     setForegroundColor(RED);
     printTitle();
     for (int i = 0; i < 3; i++) {
-        printf("\x1B[%dH", menuOptions[i].consoleRow);
+        setCursorVerticalPosition(menuOptions[i].consoleRow);
         if (currentSelection == i) {
             setForegroundColor(WHITE);
-            printf("\x1B[%dG< %s >", (consoleWidth - ((int)strlen(menuOptions[currentSelection].text) + 4)) / 2, menuOptions[currentSelection].text);
+            printf("\x1B[%dG< %s >", (consoleWidth - ((int)strlen(menuOptions[i].text) + 4)) / 2, menuOptions[i].text);
         } else {
             setForegroundColor(RED);
             printCenteredText(menuOptions[i].text);
@@ -105,7 +253,7 @@ uint8_t openGameSetup(uint8_t currentSelection) {
         // Reprint the entire menu if the console was resized.
         if (currentConsoleDimensions != getConsoleDimensions()) return openGameSetup(currentSelection);
         ch = _getch();
-        const int previousSelection = currentSelection;
+        const int8_t previousSelection = currentSelection;
         if (ch == 0 || ch == 224) {
             switch (_getch()) {
                 case 72: // Up Arrow
@@ -153,25 +301,25 @@ uint8_t openSettingsMenu(uint8_t currentSelection) {
     return currentSelection;
 }
 
-uint8_t openMainMenu(uint8_t currentSelection) {
+int8_t openMainMenu(int8_t currentSelection) {
     const uint32_t currentConsoleDimensions = getConsoleDimensions();
     const uint16_t consoleWidth = currentConsoleDimensions & 0xFFFF;
     const uint16_t consoleMidRow = (currentConsoleDimensions >> 16 & 0xFFFF) / 2;
     const MenuOption menuOptions[] = {
-        {"Start Game", consoleMidRow - 3},
-        {"Load  Game", consoleMidRow - 1},
-        {"Settings", consoleMidRow + 1},
-        {"Exit", consoleMidRow + 3},
+        {"Start Game", consoleMidRow - 3, 0},
+        {"Load  Game", consoleMidRow - 1, 0},
+        {"Settings", consoleMidRow + 1, 0},
+        {"Exit", consoleMidRow + 3, 0},
     };
     resetTextDecoration();
     clearConsole();
     setForegroundColor(RED);
     printTitle();
     for (int i = 0; i < 4; i++) {
-        printf("\x1B[%dH", menuOptions[i].consoleRow);
+        setCursorVerticalPosition(menuOptions[i].consoleRow);
         if (currentSelection == i) {
             setForegroundColor(WHITE);
-            printf("\x1B[%dG< %s >", (consoleWidth - ((int)strlen(menuOptions[currentSelection].text) + 4)) / 2, menuOptions[currentSelection].text);
+            printf("\x1B[%dG< %s >", (consoleWidth - ((int)strlen(menuOptions[i].text) + 4)) / 2, menuOptions[i].text);
         } else {
             setForegroundColor(RED);
             printCenteredText(menuOptions[i].text);
@@ -182,7 +330,7 @@ uint8_t openMainMenu(uint8_t currentSelection) {
         // Reprint the entire menu if the console was resized.
         if (currentConsoleDimensions != getConsoleDimensions()) return openMainMenu(currentSelection);
         ch = _getch();
-        const int previousSelection = currentSelection;
+        const int8_t previousSelection = currentSelection;
         if (ch == 0 || ch == 224) {
             switch (_getch()) {
                 case 72: // Up Arrow

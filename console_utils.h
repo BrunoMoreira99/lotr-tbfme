@@ -2,13 +2,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef enum {
-    BLACK = 0x000000,
-    WHITE = 0xFFFFFF,
-    RED = 231 << 16 | 72 << 8 | 86 // 0xE74856
-    // TODO: Add more colors.
-} Color;
-
 bool setupConsole(void);
 
 void setConsoleWindowTitle(const char* str);
@@ -28,8 +21,12 @@ static inline void clearCurrentLine(void) {
     printf("\x1B[2K");
 }
 
-static inline void clearCurrentLineFromCursor(void) {
+static inline void clearCurrentLineFromCursorForward(void) {
     printf("\x1B[0K");
+}
+
+static inline void clearCurrentLineFromCursorBackward(void) {
+    printf("\x1B[1K");
 }
 
 static inline void resetForegroundColor(void) {
@@ -78,5 +75,3 @@ static inline void resetCursorPosition(void) {
 uint32_t getConsoleDimensions(void);
 uint16_t getConsoleWidth(void);
 uint16_t getConsoleHeight(void);
-
-char* readLine(char* str, const size_t maxSize, const bool allowEmpty);

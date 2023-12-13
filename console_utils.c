@@ -53,6 +53,11 @@ void setBackgroundColor(const uint32_t color) {
 }
 
 uint32_t getCursorPosition(void) {
+    /* Implementation using ANSI Escape Codes and _getch to read the keyboard input buffer and thus preventing the
+     * echoing of the cursor's position into the console.
+     * The usage of ANSI Escape Codes is nice as it is relatively "multi-platform", but we are using _getch anyway
+     * (which is a MS-DOS/Win library) so we might as well just use GetConsoleScreenBufferInfo from the WinAPI.
+     * Since we are targeting Windows anyway, the WinAPI is preferable here as _getch was falling into a race condition.
     int cursorTop, cursorLeft;
     // Query the cursor position.
     printf("\x1B[6n");
@@ -67,9 +72,15 @@ uint32_t getCursorPosition(void) {
     cursorPosReport[i] = '\0';
     if (sscanf(cursorPosReport, "[%d;%d", &cursorTop, &cursorLeft) != 2) return 0;
     return cursorTop << 16 | cursorLeft;
+    */
+    const HANDLE hConsoleOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+    if (!GetConsoleScreenBufferInfo(hConsoleOut, &consoleInfo)) return 1 << 16 | 1;
+    return (consoleInfo.dwCursorPosition.Y + 1) << 16 | (consoleInfo.dwCursorPosition.X + 1);
 }
 
 uint32_t getConsoleDimensions(void) {
+    /* Implementation using ANSI Escape Codes.
     // This is a little bit of an hack, but good enough.
     const uint32_t currentCursorPosition = getCursorPosition();
     // Move cursor the bottom right corner.
@@ -78,6 +89,11 @@ uint32_t getConsoleDimensions(void) {
     // Move cursor back to its original position.
     setCursorPosition(currentCursorPosition);
     return result;
+    */
+    const HANDLE hConsoleOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+    if (!GetConsoleScreenBufferInfo(hConsoleOut, &consoleInfo)) return 30 << 16 | 120;
+    return consoleInfo.dwSize.Y << 16 | consoleInfo.dwSize.X;
 }
 
 uint16_t getConsoleWidth(void) {
@@ -86,45 +102,4 @@ uint16_t getConsoleWidth(void) {
 
 uint16_t getConsoleHeight(void) {
     return getConsoleDimensions() >> 16 & 0xFFFF;
-}
-
-char* _readLine(char* str, const size_t maxSize) {
-    if (!str) return NULL;
-    if (!fgets(str, (int)maxSize, stdin)) return NULL;
-    const size_t i = strcspn(str, "\n");
-    if (i < maxSize - 1) {
-        str[i] = '\0';
-    } else {
-        // Clear the input buffer if the line is too long.
-        int c;
-        while ((c = getchar()) != '\n' && c != EOF);
-    }
-    return str;
-}
-
-char* readLine(char* str, const size_t maxSize, const bool allowEmpty) {
-    if (!str) return NULL;
-    if (allowEmpty) {
-        _readLine(str, maxSize);
-    } else {
-        const uint32_t initialCursorPosition = getCursorPosition();
-        while (1) {
-            _readLine(str, maxSize);
-            if (str[0] == ' ') {
-                setCursorPosition(initialCursorPosition);
-                for (size_t i = 1; i < maxSize; i++) {
-                    printf(" ");
-                    if (str[i] == '\0') break;
-                }
-                setCursorPosition(initialCursorPosition);
-                continue;
-            }
-            if (str[0] == '\0') {
-                setCursorPosition(initialCursorPosition);
-                continue;
-            }
-            break;
-        }
-    }
-    return str;
 }
