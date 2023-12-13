@@ -1,6 +1,16 @@
 #pragma once
 
 typedef enum {
+   KEY_ENTER = 13,
+   KEY_ESC = 27,
+   KEY_SPACE = 32,
+   KEY_UP = 72,
+   KEY_LEFT = 75,
+   KEY_RIGHT = 77,
+   KEY_DOWN = 80
+} KeyCode;
+
+typedef enum {
     BLACK = 0x000000,
     WHITE = 0xFFFFFF,
     RED = 231 << 16 | 72 << 8 | 86, // 0xE74856

@@ -150,10 +150,10 @@ char* openMapSelector(void) {
             const int previousSelection = currentSelection;
             if (ch == 0 || ch == 224) {
                 switch (_getch()) {
-                    case 72: // Up Arrow
+                    case KEY_UP:
                         --currentSelection;
                         break;
-                    case 80: // Down Arrow
+                    case KEY_DOWN:
                         ++currentSelection;
                         break;
                 }
@@ -168,7 +168,7 @@ char* openMapSelector(void) {
             printf("> %s", mapList[currentSelection]);
             drawMapPreview(mapList[currentSelection], mapPreviewPosRow, mapPreviewPosColumn);
             setForegroundColor(RED);
-        } while (ch != 13 && ch != 32); // Pressing Enter (13) or Space (32) will exit the loop.
+        } while (ch != KEY_ENTER && ch != KEY_SPACE);
     }
     char* chosenMapFile = malloc(10 + strlen(mapList[currentSelection]) * sizeof(char));
     (void)sprintf(chosenMapFile, "Maps\\%s.map", mapList[currentSelection]);
@@ -256,10 +256,10 @@ int8_t openGameSetup(int8_t currentSelection) {
         const int8_t previousSelection = currentSelection;
         if (ch == 0 || ch == 224) {
             switch (_getch()) {
-                case 72: // Up Arrow
+                case KEY_UP:
                     currentSelection = max(0, currentSelection - 1);
                     break;
-                case 80: // Down Arrow
+                case KEY_DOWN:
                     currentSelection = min(2, currentSelection + 1);
                     break;
             }
@@ -273,7 +273,7 @@ int8_t openGameSetup(int8_t currentSelection) {
         setForegroundColor(WHITE);
         setCursorHorizontalPosition((uint16_t)(consoleWidth - (strlen(menuOptions[currentSelection].text) + 4)) / 2);
         printf("< %s >", menuOptions[currentSelection].text);
-    } while (ch != 13 && ch != 32); // Pressing Enter (13) or Space (32) will exit the loop.
+    } while (ch != KEY_ENTER && ch != KEY_SPACE);
     switch (currentSelection) {
         case 0:
             openGameSetupSinglePlayer();
@@ -333,10 +333,10 @@ int8_t openMainMenu(int8_t currentSelection) {
         const int8_t previousSelection = currentSelection;
         if (ch == 0 || ch == 224) {
             switch (_getch()) {
-                case 72: // Up Arrow
+                case KEY_UP:
                     currentSelection = max(0, currentSelection - 1);
                     break;
-                case 80: // Down Arrow
+                case KEY_DOWN:
                     currentSelection = min(3, currentSelection + 1);
                     break;
             }
@@ -350,7 +350,7 @@ int8_t openMainMenu(int8_t currentSelection) {
         setForegroundColor(WHITE);
         setCursorHorizontalPosition((uint16_t)(consoleWidth - (strlen(menuOptions[currentSelection].text) + 4)) / 2);
         printf("< %s >", menuOptions[currentSelection].text);
-    } while (ch != 13 && ch != 32); // Pressing Enter (13) or Space (32) will exit the loop.
+    } while (ch != KEY_ENTER && ch != KEY_SPACE);
     switch (currentSelection) {
         case 0:
             openGameSetup(0);
@@ -392,10 +392,7 @@ int main(void) {
             }
         }
     } else hideCursor();
-    
-    openMainMenu(0);
-    
-    printf("\n\nPress any key to continue...");
-    (void)getchar();
-    return 0;
+    while (true) {
+        openMainMenu(0);
+    }
 }
