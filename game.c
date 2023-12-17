@@ -11,7 +11,6 @@
 #include "ui_io_utils.h"
 #include "game.h"
 
-
 const GameSettings GameSettings_Default = {
     5,
     100, 100, 100, 100, 100,
@@ -52,6 +51,8 @@ Color getTerrainBackgroundColor(const TerrainType terrainType) {
             return C_SNOW;
         case LAVA:
             return C_LAVA;
+        case BASALT:
+            return C_BASALT;
     }
     return BLACK;
 }
@@ -75,7 +76,7 @@ void advanceTurn(GameData* gameData) {
     if (gameData->currentPlayerTurn == 0) ++gameData->currentRound;
     // Add Castar Coins based on the player's number of mines.
     const uint16_t playerMinesCount = getNumberOfMines(gameData, gameData->currentPlayerTurn);
-    if (playerMinesCount) gameData->players[gameData->currentPlayerTurn].coins += playerMinesCount * getGameSettings()->MINE_INCOME;
+    if (playerMinesCount) currentPlayer(gameData).coins += playerMinesCount * getGameSettings()->MINE_INCOME;
 }
 
 bool buildEntity(GameBoardCell* cell, Player* player, const EntityType entityType) {
@@ -229,128 +230,115 @@ void printUnitList(GameData* gameData) {
 }
 
 void clearActionsMenu(void) {
-    for (uint16_t i = 0; i < 9; i++) {
-        setCursorVerticalHorizontalPosition(37 + i, 108);
+    for (uint16_t i = 0; i < 7; i++) {
+        setCursorVerticalHorizontalPosition(38 + i, 108);
         clearCurrentLineFromCursorBackward();
     }
 }
 
-int32_t openExitGameMenu(void) {
-    const MenuOption menuOptions[] = {
-        {"Save and Exit to Desktop", 40, 10},
-        {"Save and Exit to Main Menu", 42, 10},
-        {"Exit to Desktop without saving", 40, 60},
-        {"Exit to Main Menu without saving", 42, 60}
-    };
+int32_t makeActionMenu(const GameData* gameData, const char* title, const char* footer, ActionMenuOption menuOptions[], const uint8_t numberOfOptions, int32_t* selection) {
     clearActionsMenu();
     setCursorVerticalHorizontalPosition(37, 3);
     drawRoundedBox(105, 9);
-    int32_t currentSelection = 0;
-    for (int i = 0; i < 4; i++) {
-        setCursorVerticalHorizontalPosition(menuOptions[i].consoleRow, menuOptions[i].consoleColumn);
+    if (title != NULL) {
+        setCursorVerticalHorizontalPosition(37, 11);
+        printf(" %s ", title);
+    }
+    if (footer != NULL) {
+        setCursorVerticalHorizontalPosition(45, 11);
+        printf(" %s ", footer);
+    }
+    int32_t currentSelection = selection == NULL ? 0 : *selection;
+    for (uint8_t i = 0; i < numberOfOptions; i++) {
+        setCursorVerticalHorizontalPosition(38 + menuOptions[i].row * 2, menuOptions[i].consoleColumn);
         if (currentSelection == i) {
             printf("\x1B[5m>\x1B[25m %s", menuOptions[i].text);
         } else {
             printf("  %s", menuOptions[i].text);
         }
+        if (menuOptions[i].castarCoinCost > 0) {
+            setForegroundColor(menuOptions[i].castarCoinCost > currentPlayer(gameData).coins ? RED : GREEN);
+            printf(" (₵%d)", menuOptions[i].castarCoinCost);
+            resetForegroundColor();
+        }
     }
     int ch;
     do {
         ch = _getch();
-        if (ch == KEY_ESC) return 4;
+        if (ch == KEY_ESC) return MENU_BACK;
         const int32_t previousSelection = currentSelection;
-        if (ch == 0 || ch == 224) {
-            switch (_getch()) {
-                case KEY_UP:
-                    --currentSelection;
-                    break;
-                case KEY_DOWN:
-                    ++currentSelection;
-                    break;
-                case KEY_RIGHT:
-                    currentSelection += 2;
-                    break;
-                case KEY_LEFT:
-                    currentSelection -= 2;
-                    break;
-            }
-            currentSelection = (currentSelection + 4) % 4;
+        if (ch == 0 || ch == 224) ch = _getch();
+        switch (ch) {
+            case KEY_W:
+            case KEY_UP:
+                --currentSelection;
+                break;
+            case KEY_S:
+            case KEY_DOWN:
+                ++currentSelection;
+                break;
+            case KEY_D:
+            case KEY_RIGHT:
+                currentSelection += 2;
+                break;
+            case KEY_A:
+            case KEY_LEFT:
+                currentSelection -= 2;
+                break;
         }
+        currentSelection = (currentSelection + numberOfOptions) % numberOfOptions;
         if (currentSelection == previousSelection) continue;
-        setCursorVerticalHorizontalPosition(menuOptions[previousSelection].consoleRow, menuOptions[previousSelection].consoleColumn);
+        if (selection != NULL) *selection = currentSelection;
+        setCursorVerticalHorizontalPosition(38 + menuOptions[previousSelection].row * 2, menuOptions[previousSelection].consoleColumn);
         printf("  %s", menuOptions[previousSelection].text);
-        setCursorVerticalHorizontalPosition(menuOptions[currentSelection].consoleRow, menuOptions[currentSelection].consoleColumn);
+        setCursorVerticalHorizontalPosition(38 + menuOptions[currentSelection].row * 2, menuOptions[currentSelection].consoleColumn);
         printf("\x1B[5m>\x1B[25m %s", menuOptions[currentSelection].text);
     } while (ch != KEY_ENTER && ch != KEY_SPACE);
     return currentSelection;
 }
 
-int32_t openActionsMenu(GameData* gameData, int32_t* currentSelection) {
-    const MenuOption menuOptions[] = {
-        {"Build", 40, 10},
-        {"Spawn Unit", 42, 10},
-        {"Select Building", 40, 45},
-        {"Select Unit", 42, 45},
-        {"End Turn", 40, 80},
-        {"Exit Game", 42, 80}
-    };
-    clearActionsMenu();
-    setCursorVerticalHorizontalPosition(37, 3);
-    drawRoundedBox(105, 9);
-    for (int i = 0; i < 6; i++) {
-        setCursorVerticalHorizontalPosition(menuOptions[i].consoleRow, menuOptions[i].consoleColumn);
-        if (*currentSelection == i) {
-            printf("\x1B[5m>\x1B[25m %s", menuOptions[i].text);
-        } else {
-            printf("  %s", menuOptions[i].text);
-        }
-    }
-    int ch;
-    do {
-        ch = _getch();
-        if (ch == KEY_ESC) {
-            return 5; // 5 = Exit Game Menu
-        }
-        const int32_t previousSelection = *currentSelection;
-        if (ch == 0 || ch == 224) {
-            switch (_getch()) {
-                case KEY_UP:
-                    --(*currentSelection);
-                    break;
-                case KEY_DOWN:
-                    ++(*currentSelection);
-                    break;
-                case KEY_RIGHT:
-                    *currentSelection += 2;
-                    break;
-                case KEY_LEFT:
-                    *currentSelection -= 2;
-                    break;
-            }
-            *currentSelection = (*currentSelection + 6) % 6;
-        }
-        // Do nothing if the selection did not change.
-        if (*currentSelection == previousSelection) continue;
-        setCursorVerticalHorizontalPosition(menuOptions[previousSelection].consoleRow, menuOptions[previousSelection].consoleColumn);
-        printf("  %s", menuOptions[previousSelection].text);
-        setCursorVerticalHorizontalPosition(menuOptions[*currentSelection].consoleRow, menuOptions[*currentSelection].consoleColumn);
-        printf("\x1B[5m>\x1B[25m %s", menuOptions[*currentSelection].text);
-    } while (ch != KEY_ENTER && ch != KEY_SPACE);
-    return *currentSelection;
+int32_t openExitGameMenu(void) {
+    return makeActionMenu(NULL, "Exit Game", MENU_BACK_FOOTER, (ActionMenuOption[]){
+        {"Save and Exit to Desktop", 0, 1, 10},
+        {"Save and Exit to Main Menu", 0, 2, 10},
+        {"Exit to Desktop without saving", 0, 1, 60},
+        {"Exit to Main Menu without saving", 0, 2, 60}
+    }, 4, NULL);
+}
+
+int32_t openCreateBuildingMenu(GameData* gameData) {
+    const GameSettings *gameSettings = getGameSettings();
+    return makeActionMenu(gameData, "Build...", MENU_BACK_FOOTER, (ActionMenuOption[]){
+        {"Mines", gameSettings->MINES_COST, 1, 10},
+        {"Barracks", gameSettings->BARRACKS_COST, 2, 10},
+        {"Stables", gameSettings->STABLES_COST, 1, 45},
+        {"Armoury", gameSettings->ARMOURY_COST, 2, 45}
+    }, 4, NULL);
+}
+
+int32_t openMainActionsMenu(GameData* gameData, int32_t* currentSelection) {
+    return makeActionMenu(gameData, "Actions", NULL, (ActionMenuOption[]){
+        {"Build", 0, 1, 10},
+        {"Spawn Unit", 0, 2, 10},
+        {"Select Building", 0, 1, 45},
+        {"Select Unit", 0, 2, 45},
+        {"End Turn", 0, 1, 80},
+        {"Exit Game", 0, 2, 80}
+    }, 6, currentSelection);
 }
 
 void printTurnInfoBox(const GameData* gameData) {
     setCursorVerticalHorizontalPosition(37, 109);
     drawRoundedBox(26, 9);
-    setCursorVerticalHorizontalPosition(37, 112);
-    printf("Round %d", gameData->currentRound);
+    setCursorVerticalHorizontalPosition(37, 111);
+    printf(" Round %d ", gameData->currentRound);
     setCursorVerticalHorizontalPosition(39, 118);
     printf("Player %d", gameData->currentPlayerTurn + 1);
-    const char *currentPlayerName = gameData->players[gameData->currentPlayerTurn].name;
+    const char *currentPlayerName = currentPlayer(gameData).name;
     setCursorVerticalHorizontalPosition(40, 109 + (uint16_t)(26 - strlen(currentPlayerName)) / 2);
     printf("%s", currentPlayerName);
     setCursorVerticalHorizontalPosition(42, 116);
-    const int32_t playerCoins = gameData->players[gameData->currentPlayerTurn].coins;
+    const int32_t playerCoins = currentPlayer(gameData).coins;
     printf("Castar Coins");
     setCursorVerticalHorizontalPosition(43, 122 - (uint16_t)getNumDigits(playerCoins) / 2);
     printf("%d", playerCoins);
@@ -363,9 +351,10 @@ void Game(GameData* gameData) {
     while (!gameData->isGameOver) {
         int32_t currentSelection = 0;
         while (true) {
-            const int32_t action = openActionsMenu(gameData, &currentSelection);
+            const int32_t action = openMainActionsMenu(gameData, &currentSelection);
             if (action == 0) {
-                // TODO: Implement Build
+                openCreateBuildingMenu(gameData);
+                break;
             } else if (action == 1) {
                 // TODO: Implement Spawn Unit
             } else if (action == 2) {
@@ -375,7 +364,7 @@ void Game(GameData* gameData) {
             } else if (action == 4) {
                 advanceTurn(gameData);
                 break;
-            } else if (action == 5) {
+            } else {
                 const int32_t exitResult = openExitGameMenu();
                 switch (exitResult) {
                     case 0:

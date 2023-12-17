@@ -11,7 +11,8 @@ typedef enum {
     WATER,
     BRIDGE,
     SNOW,
-    LAVA
+    LAVA,
+    BASALT
 } TerrainType;
 
 typedef enum {
@@ -49,6 +50,8 @@ typedef struct {
     bool isGameOver;
     GameBoardCell board[17][26];
 } GameData;
+
+#define currentPlayer(gameData) ((gameData)->players[(gameData)->currentPlayerTurn])
 
 typedef struct {
     uint16_t MINE_INCOME;

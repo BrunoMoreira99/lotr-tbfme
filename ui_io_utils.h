@@ -1,19 +1,27 @@
 #pragma once
 
+#define MENU_BACK INT32_MAX
+#define MENU_BACK_FOOTER "Press ESC to Go Back"
+
 typedef enum {
-   KEY_ENTER = 13,
-   KEY_ESC = 27,
-   KEY_SPACE = 32,
-   KEY_UP = 72,
-   KEY_LEFT = 75,
-   KEY_RIGHT = 77,
-   KEY_DOWN = 80
+    KEY_ENTER = 13,
+    KEY_ESC = 27,
+    KEY_SPACE = 32,
+    KEY_UP = 72,
+    KEY_LEFT = 75,
+    KEY_RIGHT = 77,
+    KEY_DOWN = 80,
+    KEY_W = 119,
+    KEY_A = 97,
+    KEY_S = 115,
+    KEY_D = 100
 } KeyCode;
 
 typedef enum {
     BLACK = 0x000000,
     WHITE = 0xFFFFFF,
     RED = 231 << 16 | 72 << 8 | 86, // 0xE74856
+    GREEN = 0x98C379,
     // Player Colors
     C_GONDOR = 0x213B79,
     C_MORDOR = 0xE74856,
@@ -25,14 +33,21 @@ typedef enum {
     C_WATER = 0x213B79,
     C_BRIDGE = 0xAC8B4A,
     C_SNOW = 0xFFFFFF,
-    C_LAVA = 0xE95F1A
+    C_LAVA = 0xE95F1A,
+    C_BASALT = 0x33292D
 } Color;
 
 typedef struct {
     const char* text;
-    const uint16_t consoleRow;
-    const uint16_t consoleColumn;
+    const int16_t rowOffset;
 } MenuOption;
+
+typedef struct {
+    const char* text;
+    const uint16_t castarCoinCost;
+    const uint8_t row;
+    const uint16_t consoleColumn;
+} ActionMenuOption;
 
 void printCenteredText(const char* str);
 

@@ -10,7 +10,6 @@
 #include "ui_io_utils.h"
 #include "game.h"
 
-
 int8_t openMainMenu(int8_t currentSelection);
 
 inline void printTitle(void) {
@@ -146,19 +145,20 @@ char* openMapSelector(void) {
         }
         int ch;
         do {
-            ch = _getch();
             const int previousSelection = currentSelection;
-            if (ch == 0 || ch == 224) {
-                switch (_getch()) {
-                    case KEY_UP:
-                        --currentSelection;
-                        break;
-                    case KEY_DOWN:
-                        ++currentSelection;
-                        break;
-                }
-                currentSelection = (currentSelection + mapCount) % mapCount;
+            ch = _getch();
+            if (ch == 0 || ch == 224) ch = _getch();
+            switch (ch) {
+                case KEY_W:
+                case KEY_UP:
+                    --currentSelection;
+                    break;
+                case KEY_S:
+                case KEY_DOWN:
+                    ++currentSelection;
+                    break;
             }
+            currentSelection = (currentSelection + mapCount) % mapCount;
             if (currentSelection == previousSelection) continue;
             setCursorVerticalHorizontalPosition(5 + (uint16_t)previousSelection * 2, 4);
             setForegroundColor(RED);
@@ -226,20 +226,16 @@ void openGameSetupMultiPlayer(void) {
     startNewMultiplayerGame(chosenMapFile, player1Name, player2Name, false);    
 }
 
-int8_t openGameSetup(int8_t currentSelection) {
+int8_t makeMenu(const MenuOption* menuOptions, const int8_t numberOfOptions, int8_t currentSelection) {
     const uint32_t currentConsoleDimensions = getConsoleDimensions();
     const uint16_t consoleWidth = currentConsoleDimensions & 0xFFFF;
     const uint16_t consoleMidRow = (currentConsoleDimensions >> 16 & 0xFFFF) / 2;
-    const MenuOption menuOptions[] = {
-        {"Single Player (vs CPU)", consoleMidRow - 2, 0},
-        {"Multiplayer (2 Players)", consoleMidRow, 0},
-        {"Back", consoleMidRow + 3, 0},
-    };
+    resetTextDecoration();
     clearConsole();
     setForegroundColor(RED);
     printTitle();
-    for (int i = 0; i < 3; i++) {
-        setCursorVerticalPosition(menuOptions[i].consoleRow);
+    for (int i = 0; i < numberOfOptions; i++) {
+        setCursorVerticalPosition((uint16_t)(consoleMidRow + menuOptions[i].rowOffset));
         if (currentSelection == i) {
             setForegroundColor(WHITE);
             printf("\x1B[%dG< %s >", (consoleWidth - ((int)strlen(menuOptions[i].text) + 4)) / 2, menuOptions[i].text);
@@ -251,30 +247,40 @@ int8_t openGameSetup(int8_t currentSelection) {
     int ch;
     do {
         // Reprint the entire menu if the console was resized.
-        if (currentConsoleDimensions != getConsoleDimensions()) return openGameSetup(currentSelection);
-        ch = _getch();
+        if (currentConsoleDimensions != getConsoleDimensions()) return makeMenu(menuOptions, numberOfOptions, currentSelection);
         const int8_t previousSelection = currentSelection;
-        if (ch == 0 || ch == 224) {
-            switch (_getch()) {
-                case KEY_UP:
-                    currentSelection = max(0, currentSelection - 1);
-                    break;
-                case KEY_DOWN:
-                    currentSelection = min(2, currentSelection + 1);
-                    break;
-            }
+        ch = _getch();
+        if (ch == 0 || ch == 224) ch = _getch();
+        switch (ch) {
+            case KEY_W:
+            case KEY_UP:
+                currentSelection = max(0, currentSelection - 1);
+            break;
+            case KEY_S:
+            case KEY_DOWN:
+                currentSelection = min(numberOfOptions - 1, currentSelection + 1);
+            break;
         }
         // Do nothing if the selection did not change.
         if (currentSelection == previousSelection) continue;
-        clearLine(menuOptions[previousSelection].consoleRow);
+        clearLine((uint16_t)(consoleMidRow + menuOptions[previousSelection].rowOffset));
         setForegroundColor(RED);
         printCenteredText(menuOptions[previousSelection].text);
-        clearLine(menuOptions[currentSelection].consoleRow);
+        clearLine((uint16_t)(consoleMidRow + menuOptions[currentSelection].rowOffset));
         setForegroundColor(WHITE);
         setCursorHorizontalPosition((uint16_t)(consoleWidth - (strlen(menuOptions[currentSelection].text) + 4)) / 2);
         printf("< %s >", menuOptions[currentSelection].text);
     } while (ch != KEY_ENTER && ch != KEY_SPACE);
-    switch (currentSelection) {
+    return currentSelection;
+}
+
+void openGameSetup(void) {
+    const int8_t selection = makeMenu((MenuOption[]){
+        {"Single Player (vs CPU)", -2},
+        {"Multiplayer (2 Players)", 0},
+        {"Back", 3}
+    }, 3, 0);
+    switch (selection) {
         case 0:
             openGameSetupSinglePlayer();
             break;
@@ -285,89 +291,42 @@ int8_t openGameSetup(int8_t currentSelection) {
             openMainMenu(0);
             break;
         default:
-            // It should be impossible to get here.
-            return openGameSetup(currentSelection);
+            // It should be impossible to get here. Exit with code error 2.
+            exit(2);
     }
-    return currentSelection;
 }
 
-uint8_t openLoadGameMenu(uint8_t currentSelection) {
+void openLoadGameMenu(void) {
     // TODO: Implement Load Game Menu.
-    return currentSelection;
 }
 
-uint8_t openSettingsMenu(uint8_t currentSelection) {
+void openSettingsMenu(void) {
     // TODO: Implement Settings Menu.
-    return currentSelection;
 }
 
-int8_t openMainMenu(int8_t currentSelection) {
-    const uint32_t currentConsoleDimensions = getConsoleDimensions();
-    const uint16_t consoleWidth = currentConsoleDimensions & 0xFFFF;
-    const uint16_t consoleMidRow = (currentConsoleDimensions >> 16 & 0xFFFF) / 2;
-    const MenuOption menuOptions[] = {
-        {"Start Game", consoleMidRow - 3, 0},
-        {"Load  Game", consoleMidRow - 1, 0},
-        {"Settings", consoleMidRow + 1, 0},
-        {"Exit", consoleMidRow + 3, 0},
-    };
-    resetTextDecoration();
-    clearConsole();
-    setForegroundColor(RED);
-    printTitle();
-    for (int i = 0; i < 4; i++) {
-        setCursorVerticalPosition(menuOptions[i].consoleRow);
-        if (currentSelection == i) {
-            setForegroundColor(WHITE);
-            printf("\x1B[%dG< %s >", (consoleWidth - ((int)strlen(menuOptions[i].text) + 4)) / 2, menuOptions[i].text);
-        } else {
-            setForegroundColor(RED);
-            printCenteredText(menuOptions[i].text);
-        }
-    }
-    int ch;
-    do {
-        // Reprint the entire menu if the console was resized.
-        if (currentConsoleDimensions != getConsoleDimensions()) return openMainMenu(currentSelection);
-        ch = _getch();
-        const int8_t previousSelection = currentSelection;
-        if (ch == 0 || ch == 224) {
-            switch (_getch()) {
-                case KEY_UP:
-                    currentSelection = max(0, currentSelection - 1);
-                    break;
-                case KEY_DOWN:
-                    currentSelection = min(3, currentSelection + 1);
-                    break;
-            }
-        }
-        // Do nothing if the selection did not change.
-        if (currentSelection == previousSelection) continue;
-        clearLine(menuOptions[previousSelection].consoleRow);
-        setForegroundColor(RED);
-        printCenteredText(menuOptions[previousSelection].text);
-        clearLine(menuOptions[currentSelection].consoleRow);
-        setForegroundColor(WHITE);
-        setCursorHorizontalPosition((uint16_t)(consoleWidth - (strlen(menuOptions[currentSelection].text) + 4)) / 2);
-        printf("< %s >", menuOptions[currentSelection].text);
-    } while (ch != KEY_ENTER && ch != KEY_SPACE);
-    switch (currentSelection) {
+void openMainMenu(void) {
+    const int8_t selection = makeMenu((MenuOption[]){
+        {"Start Game", -3},
+        {"Load  Game", -1},
+        {"Settings", 1},
+        {"Exit", 3}
+    }, 4, 0);
+    switch (selection) {
         case 0:
-            openGameSetup(0);
+            openGameSetup();
             break;
         case 1:
-            openLoadGameMenu(0);
+            openLoadGameMenu();
             break;
         case 2:
-            openSettingsMenu(0);
+            openSettingsMenu();
             break;
         case 3:
             exit(0);
         default:
-            // It should be impossible to get here.
-            return openMainMenu(currentSelection);
+            // It should be impossible to get here. Exit with code error 2.
+            exit(2);
     }
-    return currentSelection;
 }
 
 int main(void) {
