@@ -57,6 +57,19 @@ Color getTerrainBackgroundColor(const TerrainType terrainType) {
     return BLACK;
 }
 
+bool canBuildInCell(const GameData* gameData, const GameBoardCell* cell) {
+    if (cell->entityType != EMPTY_CELL) return false;
+    switch (cell->terrainType) {
+        case BRIDGE:
+        case RIVER:
+        case WATER:
+        case LAVA:
+            return false;
+        default:
+            return true;
+    }
+}
+
 uint16_t getNumberOfMines(const GameData* gameData, const uint8_t player) {
     uint16_t minesCount = 0;
     for (int i = 0; i < 17; i++) {
@@ -80,6 +93,8 @@ void advanceTurn(GameData* gameData) {
 }
 
 bool buildEntity(GameBoardCell* cell, Player* player, const EntityType entityType) {
+    // If the cell is not empty, something went wrong.
+    assert(cell->entityType == EMPTY_CELL);
     const GameSettings *gameSettings = getGameSettings();
     uint16_t eCost = 0;
     uint16_t eHealth = 0;
@@ -229,6 +244,13 @@ void printUnitList(GameData* gameData) {
     drawRoundedBox(26, 35);
 }
 
+void clearTurnInfoBox(void) {
+    for (uint16_t i = 0; i < 7; i++) {
+        setCursorVerticalHorizontalPosition(38 + i, 109);
+        clearCurrentLineFromCursorForward();
+    }
+}
+
 void clearActionsMenu(void) {
     for (uint16_t i = 0; i < 7; i++) {
         setCursorVerticalHorizontalPosition(38 + i, 108);
@@ -236,18 +258,68 @@ void clearActionsMenu(void) {
     }
 }
 
+GameBoardCell* getSelectedGameBoardCell(GameData* gameData, Int16Vector2* currentCoord, bool (*isValidCell)(const GameData*, const GameBoardCell*)) {
+    for (int16_t i = 0; i < 16; i++) {
+        for (int16_t j = 0; j < 27; j++) {
+            if (gameData->board[i][j].entityType == BASE && gameData->board[i][j].owner == gameData->currentPlayerTurn) {
+                currentCoord->x = i;
+                currentCoord->y = j;
+                i = 16;
+                break;
+            }
+        }
+    }
+    bool isSelectedCellValid;
+    int ch;
+    do {
+        const GameBoardCell *currentCell = &gameData->board[currentCoord->x][currentCoord->y];
+        setCursorVerticalHorizontalPosition(1 + 2 * (currentCoord->x + 1), 4 * (currentCoord->y + 1));
+        enableBlinking();
+        if ((isSelectedCellValid = isValidCell(gameData, currentCell))) {
+            printf("███");
+        } else {
+            setBackgroundColor(getTerrainBackgroundColor(currentCell->terrainType));
+            setForegroundColor(RED);
+            printf("╳╳╳");
+            resetBackgroundColor();
+            resetForegroundColor();
+        }
+        disableBlinking();
+        const Int16Vector2 previousCoord = *currentCoord;
+        ch = _getch();
+        if (ch == 0 || ch == 224) ch = _getch();
+        switch (ch) {
+            case KEY_W:
+            case KEY_UP:
+                --currentCoord->x;
+                break;
+            case KEY_S:
+            case KEY_DOWN:
+                ++currentCoord->x;
+                break;
+            case KEY_D:
+            case KEY_RIGHT:
+                ++currentCoord->y;
+                break;
+            case KEY_A:
+            case KEY_LEFT:
+                --currentCoord->y;
+                break;
+        }
+        setCursorVerticalHorizontalPosition(1 + 2 * (previousCoord.x + 1), 4 * (previousCoord.y + 1));
+        printGameCell(gameData, &gameData->board[previousCoord.x][previousCoord.y]);
+        resetBackgroundColor();
+        if (ch == KEY_ESC) return NULL;
+        currentCoord->x = (int16_t)((currentCoord->x + 17) % 17);
+        currentCoord->y = (int16_t)((currentCoord->y + 26) % 26);
+    } while ((ch != KEY_ENTER && ch != KEY_SPACE) || !isSelectedCellValid);
+    return &gameData->board[currentCoord->x][currentCoord->y];
+}
+
 int32_t makeActionMenu(const GameData* gameData, const char* title, const char* footer, ActionMenuOption menuOptions[], const uint8_t numberOfOptions, int32_t* selection) {
     clearActionsMenu();
     setCursorVerticalHorizontalPosition(37, 3);
-    drawRoundedBox(105, 9);
-    if (title != NULL) {
-        setCursorVerticalHorizontalPosition(37, 11);
-        printf(" %s ", title);
-    }
-    if (footer != NULL) {
-        setCursorVerticalHorizontalPosition(45, 11);
-        printf(" %s ", footer);
-    }
+    drawBoxWithTitleAndFooter(title, footer, 105, 9, drawRoundedBox);
     int32_t currentSelection = selection == NULL ? 0 : *selection;
     for (uint8_t i = 0; i < numberOfOptions; i++) {
         setCursorVerticalHorizontalPosition(38 + menuOptions[i].row * 2, menuOptions[i].consoleColumn);
@@ -262,6 +334,7 @@ int32_t makeActionMenu(const GameData* gameData, const char* title, const char* 
             resetForegroundColor();
         }
     }
+    bool canAffordSelection = true;
     int ch;
     do {
         ch = _getch();
@@ -285,20 +358,24 @@ int32_t makeActionMenu(const GameData* gameData, const char* title, const char* 
             case KEY_LEFT:
                 currentSelection -= 2;
                 break;
+            default:
+                continue;
         }
         currentSelection = (currentSelection + numberOfOptions) % numberOfOptions;
-        if (currentSelection == previousSelection) continue;
         if (selection != NULL) *selection = currentSelection;
+        if (menuOptions[currentSelection].castarCoinCost > 0) {
+            canAffordSelection = menuOptions[currentSelection].castarCoinCost <= currentPlayer(gameData).coins;
+        }
         setCursorVerticalHorizontalPosition(38 + menuOptions[previousSelection].row * 2, menuOptions[previousSelection].consoleColumn);
         printf("  %s", menuOptions[previousSelection].text);
         setCursorVerticalHorizontalPosition(38 + menuOptions[currentSelection].row * 2, menuOptions[currentSelection].consoleColumn);
         printf("\x1B[5m>\x1B[25m %s", menuOptions[currentSelection].text);
-    } while (ch != KEY_ENTER && ch != KEY_SPACE);
+    } while ((ch != KEY_ENTER && ch != KEY_SPACE) || !canAffordSelection);
     return currentSelection;
 }
 
 int32_t openExitGameMenu(void) {
-    return makeActionMenu(NULL, "Exit Game", MENU_BACK_FOOTER, (ActionMenuOption[]){
+    return makeActionMenu(NULL, "Exit Game", MENU_FOOTER_GO_BACK, (ActionMenuOption[]){
         {"Save and Exit to Desktop", 0, 1, 10},
         {"Save and Exit to Main Menu", 0, 2, 10},
         {"Exit to Desktop without saving", 0, 1, 60},
@@ -308,30 +385,53 @@ int32_t openExitGameMenu(void) {
 
 int32_t openCreateBuildingMenu(GameData* gameData) {
     const GameSettings *gameSettings = getGameSettings();
-    return makeActionMenu(gameData, "Build...", MENU_BACK_FOOTER, (ActionMenuOption[]){
+    ActionMenuOption actionMenu[] = {
         {"Mines", gameSettings->MINES_COST, 1, 10},
         {"Barracks", gameSettings->BARRACKS_COST, 2, 10},
-        {"Stables", gameSettings->STABLES_COST, 1, 45},
-        {"Armoury", gameSettings->ARMOURY_COST, 2, 45}
-    }, 4, NULL);
+        {"Stables", gameSettings->STABLES_COST, 1, 42},
+        {"Armoury", gameSettings->ARMOURY_COST, 2, 42}
+    };
+    const int32_t selection = makeActionMenu(gameData, "Build...", MENU_FOOTER_GO_BACK, actionMenu, 4, NULL);
+    if (selection == MENU_BACK) return selection;
+    const EntityType selectedBuilding = selection + 2;
+    clearActionsMenu();
+    setCursorVerticalHorizontalPosition(37, 3);
+    char *boxTitle = malloc((strlen(actionMenu[selection].text) + 10) * sizeof(char));
+    (void)sprintf(boxTitle, "Build %s...", actionMenu[selection].text);
+    drawBoxWithTitleAndFooter(boxTitle, MENU_FOOTER_CANCEL, 105, 9, drawRoundedBox);
+    free(boxTitle);
+    setCursorVerticalHorizontalPosition(40, 12);
+    printf("Navigate the map with the arrow keys or WASD to choose where you want to build.");
+    setCursorVerticalHorizontalPosition(42, 12);
+    printf("Press SPACE or ENTER to confirm the location.");
+    Int16Vector2 selectedCellCoord;
+    GameBoardCell* selectedCell = getSelectedGameBoardCell(gameData, &selectedCellCoord, canBuildInCell);
+    if (selectedCell == NULL) return openCreateBuildingMenu(gameData);
+    buildEntity(selectedCell, &currentPlayer(gameData), selectedBuilding);
+    setCursorVerticalHorizontalPosition(1 + 2 * (selectedCellCoord.x + 1), 4 * (selectedCellCoord.y + 1));
+    printGameCell(gameData, selectedCell);
+    resetBackgroundColor();
+    return selection;
 }
 
-int32_t openMainActionsMenu(GameData* gameData, int32_t* currentSelection) {
+int32_t openMainActionsMenu(const GameData* gameData, int32_t* currentSelection) {
     return makeActionMenu(gameData, "Actions", NULL, (ActionMenuOption[]){
         {"Build", 0, 1, 10},
         {"Spawn Unit", 0, 2, 10},
-        {"Select Building", 0, 1, 45},
-        {"Select Unit", 0, 2, 45},
+        {"Select Building", 0, 1, 42},
+        {"Select Unit", 0, 2, 42},
         {"End Turn", 0, 1, 80},
         {"Exit Game", 0, 2, 80}
     }, 6, currentSelection);
 }
 
 void printTurnInfoBox(const GameData* gameData) {
+    clearTurnInfoBox();
     setCursorVerticalHorizontalPosition(37, 109);
-    drawRoundedBox(26, 9);
-    setCursorVerticalHorizontalPosition(37, 111);
-    printf(" Round %d ", gameData->currentRound);
+    char *roundInfo = malloc((getNumDigits((int32_t)gameData->currentRound + 1) + 7) * sizeof(char));
+    (void)sprintf(roundInfo, "Round %d", gameData->currentRound + 1);
+    drawBoxWithTitleAndFooter(roundInfo, NULL, 26, 9, drawRoundedBox);
+    free(roundInfo);
     setCursorVerticalHorizontalPosition(39, 118);
     printf("Player %d", gameData->currentPlayerTurn + 1);
     const char *currentPlayerName = currentPlayer(gameData).name;
@@ -340,15 +440,15 @@ void printTurnInfoBox(const GameData* gameData) {
     setCursorVerticalHorizontalPosition(42, 116);
     const int32_t playerCoins = currentPlayer(gameData).coins;
     printf("Castar Coins");
-    setCursorVerticalHorizontalPosition(43, 122 - (uint16_t)getNumDigits(playerCoins) / 2);
-    printf("%d", playerCoins);
+    setCursorVerticalHorizontalPosition(43, 122 - (max(3, (uint16_t)getNumDigits(playerCoins)) + 2) / 2);
+    printf("₵%3d", playerCoins);
 }
 
 void Game(GameData* gameData) {
     printGameBoard(gameData);
-    printUnitList(gameData);
-    printTurnInfoBox(gameData);
     while (!gameData->isGameOver) {
+        printUnitList(gameData);
+        printTurnInfoBox(gameData);
         int32_t currentSelection = 0;
         while (true) {
             const int32_t action = openMainActionsMenu(gameData, &currentSelection);
@@ -383,6 +483,7 @@ void Game(GameData* gameData) {
                 }
             }
         }
+        if (currentPlayer(gameData).coins <= 0) advanceTurn(gameData);
     }
 }
 

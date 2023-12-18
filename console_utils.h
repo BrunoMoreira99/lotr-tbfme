@@ -49,6 +49,14 @@ static inline void hideCursor(void) {
     printf("\x1B[?25l");
 }
 
+static inline void enableBlinking(void) {
+    printf("\x1B[5m");
+}
+
+static inline void disableBlinking(void) {
+    printf("\x1B[25m");
+}
+
 uint32_t getCursorPosition(void);
 
 static inline void setCursorPosition(const uint32_t position) {

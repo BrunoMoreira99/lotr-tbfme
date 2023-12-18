@@ -1,7 +1,8 @@
 #pragma once
 
 #define MENU_BACK INT32_MAX
-#define MENU_BACK_FOOTER "Press ESC to Go Back"
+#define MENU_FOOTER_GO_BACK "Press ESC to Go Back"
+#define MENU_FOOTER_CANCEL "Press ESC to Cancel"
 
 typedef enum {
     KEY_ENTER = 13,
@@ -55,6 +56,7 @@ void drawFullWidthBoxTitle(const char* title);
 void drawRoundedBox(const uint16_t width, const uint16_t height);
 void drawBoldBox(const uint16_t width, const uint16_t height);
 void drawBox(const uint16_t width, const uint16_t height);
+void drawBoxWithTitleAndFooter(const char* title, const char* footer, const uint16_t width, const uint16_t height, void (*boxDrawingFunc)(const uint16_t, const uint16_t));
 
 char* readLine(char* str, const size_t maxSize, const bool allowEmpty);
 char* fReadLine(FILE* fp);

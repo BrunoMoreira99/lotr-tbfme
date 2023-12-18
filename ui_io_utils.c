@@ -100,6 +100,20 @@ void drawBox(const uint16_t width, const uint16_t height) {
     printf("┘\n");
 }
 
+void drawBoxWithTitleAndFooter(const char* title, const char* footer, const uint16_t width, const uint16_t height, void (*boxDrawingFunc)(const uint16_t, const uint16_t)) {
+    const uint32_t cursorPos = getCursorPosition();
+    const uint16_t cursorTop = cursorPos >> 16 & 0xFFFF, cursorLeft = cursorPos & 0xFFFF;
+    boxDrawingFunc(width, height);
+    if (title != NULL) {
+        setCursorVerticalHorizontalPosition(cursorTop, cursorLeft + 2);
+        printf(" %s ", title);
+    }
+    if (footer != NULL) {
+        setCursorVerticalHorizontalPosition(cursorTop + height - 1, cursorLeft + 2);
+        printf(" %s ", footer);
+    }
+}
+
 /**
  * Reads a line from stdin and stores it in the string pointed to by `str`.
  * The function reads at most `maxSize` characters from the input stream, including the terminating null byte ('\0').

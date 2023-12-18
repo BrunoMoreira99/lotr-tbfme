@@ -3,6 +3,11 @@
 
 #define NO_OWNER _UI8_MAX // 255 / 0xFF
 
+typedef struct {
+    int16_t x;
+    int16_t y;
+} Int16Vector2;
+
 typedef enum {
     PLAIN,
     FOREST,

@@ -255,14 +255,15 @@ int8_t makeMenu(const MenuOption* menuOptions, const int8_t numberOfOptions, int
             case KEY_W:
             case KEY_UP:
                 currentSelection = max(0, currentSelection - 1);
-            break;
+                break;
             case KEY_S:
             case KEY_DOWN:
                 currentSelection = min(numberOfOptions - 1, currentSelection + 1);
-            break;
+                break;
+            default:
+                // Do nothing if the selection did not change.
+                continue;
         }
-        // Do nothing if the selection did not change.
-        if (currentSelection == previousSelection) continue;
         clearLine((uint16_t)(consoleMidRow + menuOptions[previousSelection].rowOffset));
         setForegroundColor(RED);
         printCenteredText(menuOptions[previousSelection].text);
