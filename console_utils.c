@@ -16,11 +16,9 @@ bool maximizeConsole(const HANDLE hConsoleOut) {
     const HWND hConsoleWindow = GetConsoleWindow();
     if (!hConsoleWindow) return false;
     if (!ShowWindow(hConsoleWindow, SW_MAXIMIZE)) return false;
-    COORD largestSize = GetLargestConsoleWindowSize(hConsoleOut);
-    if (!largestSize.X && !largestSize.Y) return false;
-    --largestSize.X;
-    --largestSize.Y;
-    return SetConsoleScreenBufferSize(hConsoleOut, largestSize);
+    CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+    if (!GetConsoleScreenBufferInfo(hConsoleOut, &consoleInfo)) return false;
+    return SetConsoleScreenBufferSize(hConsoleOut, consoleInfo.dwMaximumWindowSize);
 }
 
 bool setupConsole(void) {

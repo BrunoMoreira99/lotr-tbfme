@@ -100,6 +100,14 @@ void drawBox(const uint16_t width, const uint16_t height) {
     printf("┘\n");
 }
 
+/**
+ * Prints a box at the current position with the given title, footer, width, and height.
+ * @param title The title of the box.
+ * @param footer The footer of the box.
+ * @param width The width of the box.
+ * @param height The height of the box.
+ * @param boxDrawingFunc The box drawing function to call.
+ */
 void drawBoxWithTitleAndFooter(const char* title, const char* footer, const uint16_t width, const uint16_t height, void (*boxDrawingFunc)(const uint16_t, const uint16_t)) {
     const uint32_t cursorPos = getCursorPosition();
     const uint16_t cursorTop = cursorPos >> 16 & 0xFFFF, cursorLeft = cursorPos & 0xFFFF;

@@ -183,24 +183,27 @@ void printGameBoard(const GameData* gameData) {
     for (int i = 'A'; i <= 'Z'; i++) {
         printf(" %c  ", i);
     }
-    printf("\n  ┏");
+    printf("\n  ╭");
     for (int i = 0; i < 25; i++) {
-        printf("━━━┯");
+        printf("────");
     }
-    printf("━━━┓\n");
+    printf("───╮\n");
     for (int i = 0; i < 16; i++) {
-        if (i < 10) printf(" %d┃", i);
-        else printf("%d┃", i);
+        if (i < 10) printf(" %d│", i);
+        else printf("%d│", i);
         for (int j = 0; j < 25; j++) {
             printGameCell(gameData, &gameData->board[i][j]);
             if (gameData->board[i][j].terrainType != gameData->board[i][j + 1].terrainType) {
                 resetBackgroundColor();
             }
+            setForegroundColor(BLACK);
             printf("│");
+            resetForegroundColor();
         }
         printGameCell(gameData, &gameData->board[i][25]);
         resetBackgroundColor();
-        printf("┃\n  ┠");
+        printf("│\n  │");
+        setForegroundColor(BLACK);
         for (int j = 0; j < 25; j++) {
             if (gameData->board[i][j].terrainType == gameData->board[i + 1][j].terrainType) {
                 setBackgroundColor(getTerrainBackgroundColor(gameData->board[i][j].terrainType));
@@ -220,28 +223,31 @@ void printGameBoard(const GameData* gameData) {
         }
         printf("───");
         resetBackgroundColor();
-        printf("┨\n");
+        resetForegroundColor();
+        printf("│\n");
     }
-    printf("16┃");  
+    printf("16│");  
     for (int j = 0; j < 25; j++) {
         printGameCell(gameData, &gameData->board[16][j]);
         if (gameData->board[16][j].terrainType != gameData->board[16][j + 1].terrainType) {
             resetBackgroundColor();
         }
+        setForegroundColor(BLACK);
         printf("│");
+        resetForegroundColor();
     }
     printGameCell(gameData, &gameData->board[16][25]);
     resetBackgroundColor();
-    printf("┃\n  ┗");
+    printf("│\n  ╰");
     for (int i = 0; i < 25; i++) {
-        printf("━━━┷");
+        printf("────");
     }
-    printf("━━━┛\n");
+    printf("───╯\n");
 }
 
 void printUnitList(GameData* gameData) {
     setCursorVerticalHorizontalPosition(2, 109);
-    drawRoundedBox(26, 35);
+    drawBoxWithTitleAndFooter("Units", NULL, 26, 35, drawRoundedBox);
 }
 
 void clearTurnInfoBox(void) {

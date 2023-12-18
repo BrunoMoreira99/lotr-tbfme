@@ -352,6 +352,7 @@ int main(void) {
             }
         }
     } else hideCursor();
+    setConsoleWindowTitle("The Battle for Middle-Earth");
     while (true) {
         openMainMenu(0);
     }
