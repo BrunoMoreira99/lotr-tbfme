@@ -1,4 +1,3 @@
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +5,30 @@
 #include "console_utils.h"
 #include "ui_io_utils.h"
 
+/**
+ * Darkens a given color by a specified factor.
+ * @param color The original color in 24-bit RGB format.
+ * @param darkenFactor The factor by which to darken the color (0.0 to 1.0).
+ * @return The darkened color.
+ */
+uint32_t darkenColor(const uint32_t color, float darkenFactor) {
+    darkenFactor = 1.0f - darkenFactor;
 
+    uint8_t red = (color >> 16) & 0xFF;
+    uint8_t green = (color >> 8) & 0xFF;
+    uint8_t blue = color & 0xFF;
+
+    red = (uint8_t)((float)red * darkenFactor);
+    green = (uint8_t)((float)green * darkenFactor);
+    blue = (uint8_t)((float)blue * darkenFactor);
+
+    return (red << 16) | (green << 8) | blue;
+}
+
+/**
+ * Prints a given string centered on the console.
+ * @param str The string to be printed.
+ */
 void printCenteredText(const char* str) {
     printf("\x1B[%dG%s", (getConsoleWidth() - (int)strlen(str)) / 2, str);
 }

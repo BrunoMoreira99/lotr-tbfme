@@ -3,11 +3,6 @@
 
 #define NO_OWNER _UI8_MAX // 255 / 0xFF
 
-typedef struct {
-    int16_t x;
-    int16_t y;
-} Int16Vector2;
-
 typedef enum {
     PLAIN,
     FOREST,
@@ -56,7 +51,7 @@ typedef struct {
     GameBoardCell board[17][26];
 } GameData;
 
-#define currentPlayer(gameData) ((gameData)->players[(gameData)->currentPlayerTurn])
+#define CurrentPlayer(gameData) ((gameData)->players[(gameData)->currentPlayerTurn])
 
 typedef struct {
     uint16_t MINE_INCOME;

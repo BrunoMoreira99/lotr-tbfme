@@ -1,4 +1,5 @@
 #pragma once
+#include <stdint.h>
 
 #define MENU_BACK INT32_MAX
 #define MENU_FOOTER_GO_BACK "Press ESC to Go Back"
@@ -49,6 +50,8 @@ typedef struct {
     const uint8_t row;
     const uint16_t consoleColumn;
 } ActionMenuOption;
+
+uint32_t darkenColor(const uint32_t color, float darkenFactor);
 
 void printCenteredText(const char* str);
 
