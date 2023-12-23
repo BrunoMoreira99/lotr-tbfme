@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <conio.h>
 #include <windows.h>
+
 #include "console_utils.h"
 
 void enableVirtualTerminalProcessing(const HANDLE hConsoleOut) {
@@ -21,7 +22,7 @@ bool maximizeConsole(const HANDLE hConsoleOut) {
     return SetConsoleScreenBufferSize(hConsoleOut, consoleInfo.dwMaximumWindowSize);
 }
 
-bool setupConsole(void) {
+bool setupConsole(const char* windowTitle) {
     const HANDLE hConsoleOut = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hConsoleOut != INVALID_HANDLE_VALUE) {
         enableVirtualTerminalProcessing(hConsoleOut);
@@ -29,6 +30,7 @@ bool setupConsole(void) {
     // Set the console's input and output code page to UTF-8.
     SetConsoleCP(CP_UTF8);
     SetConsoleOutputCP(CP_UTF8);
+    if (windowTitle != NULL) setConsoleWindowTitle(windowTitle);
     return maximizeConsole(hConsoleOut);
 }
 

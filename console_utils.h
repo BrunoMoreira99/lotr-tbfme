@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-bool setupConsole(void);
+bool setupConsole(const char* windowTitle);
 
 void setConsoleWindowTitle(const char* str);
 

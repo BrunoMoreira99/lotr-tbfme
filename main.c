@@ -101,6 +101,9 @@ void drawMapPreview(const char* mapName, const uint16_t row, const uint16_t colu
             case 'L':
                 setBackgroundColor(C_LAVA);
                 break;
+            case 'T':
+                setBackgroundColor(C_BASALT);
+                break;
             case '#':
                 printf("\b\bP%d", ++player);
                 continue;
@@ -332,9 +335,8 @@ void openMainMenu(void) {
 
 int main(void) {
     // TODO: Use atexit() to add a function that runs at the exit of the program to automatically save the game.
-    
-    setConsoleWindowTitle("The Battle for Middle-Earth");
-    if (!setupConsole()) {
+
+    if (!setupConsole("The Battle for Middle-Earth")) {
         hideCursor();
         // If we get here we must have failed to resize the console window. We'll ask the user to resize it.
         uint16_t consoleWidth = getConsoleWidth();
@@ -352,7 +354,6 @@ int main(void) {
             }
         }
     } else hideCursor();
-    setConsoleWindowTitle("The Battle for Middle-Earth");
     while (true) {
         openMainMenu(0);
     }

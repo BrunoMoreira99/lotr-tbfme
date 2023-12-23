@@ -530,6 +530,9 @@ void createBoardFromMapFile(char* mapFileName, GameData* gameData) {
                 case 'L':
                     gameData->board[i][j].terrainType = LAVA;
                     break;
+                case 'T':
+                    gameData->board[i][j].terrainType = BASALT;
+                    break;
                 case '#':
                     buildEntity(&gameData->board[i][--j], &gameData->players[player++], BASE);
                     break;
