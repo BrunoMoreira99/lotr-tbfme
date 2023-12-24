@@ -7,9 +7,7 @@
 #include <assert.h>
 
 #include "console_utils.h"
-#include "math_utils.h"
 #include "ui_io_utils.h"
-#include "list.h"
 #include "game.h"
 
 const GameSettings GameSettings_Default = {
@@ -34,10 +32,10 @@ GameSettings* getGameSettings(void) {
     return GameSettings_Current;
 }
 
-Int16Vector2 getPlayerBaseCoordinate(const GameData* gameData, const Player* player) {
+Int16Vector2 getPlayerBaseCoordinate(const GameData* gameData, const uint8_t playerId) {
     for (int16_t y = 0; y < 17; y++) {
         for (int16_t x = 0; x < 26; x++) {
-            if (gameData->board[y][x].entityType == BASE && gameData->board[y][x].owner == player->id) {
+            if (gameData->board[y][x].entityType == BASE && gameData->board[y][x].owner == playerId) {
                 return (Int16Vector2){x, y};
             }
         }
@@ -45,7 +43,7 @@ Int16Vector2 getPlayerBaseCoordinate(const GameData* gameData, const Player* pla
     return (Int16Vector2){0, 0};
 }
 
-Color getTerrainBackgroundColor(const TerrainType terrain) {
+uint32_t getTerrainBackgroundColor(const TerrainType terrain) {
     switch (terrain) {
         case PLAIN:
             return C_PLAIN;
@@ -84,11 +82,11 @@ bool canUnitStepOnCell(const GameBoardCell* cell) {
     return true;
 }
 
-bool canBuildAtCoordinate(const GameData* gameData, const Int16Vector2 cellCoord) {
-    if (getManhattanDistance(getPlayerBaseCoordinate(gameData, &CurrentPlayer(gameData)), cellCoord) > 4) {
+bool canBuildAtCoordinate(const GameDataExtended* gameDataEx, const Int16Vector2 cellCoord) {
+    if (getManhattanDistance(gameDataEx->currentPlayerBaseCoord, cellCoord) > 4) {
         return false;
     }
-    const GameBoardCell* cell = &gameData->board[cellCoord.y][cellCoord.x];
+    const GameBoardCell* cell = &gameDataEx->gameData.board[cellCoord.y][cellCoord.x];
     if (cell->entityType != EMPTY_CELL) return false;
     switch (cell->terrainType) {
         case BRIDGE:
@@ -101,27 +99,38 @@ bool canBuildAtCoordinate(const GameData* gameData, const Int16Vector2 cellCoord
     }
 }
 
-List* getValidCellsToBuild(const GameData* gameData) {
-    List *validCells = createList();
+List getValidCellsToBuild(const GameDataExtended* gameDataEx) {
+    const GameData *gameData = &gameDataEx->gameData;
+    List validCells = List_init();
     for (int16_t y = 0; y < 17; y++) {
         for (int16_t x = 0; x < 26; x++) {
             if (gameData->board[y][x].entityType != EMPTY_CELL) continue;
-            if (canBuildAtCoordinate(gameData, (Int16Vector2){x, y})) {
+            if (canBuildAtCoordinate(gameDataEx, (Int16Vector2){x, y})) {
                 Int16Vector2 *c = malloc(sizeof(Int16Vector2));
                 c->x = x;
                 c->y = y;
-                List_push(validCells, c);
+                List_append(&validCells, c);
             }
         }
-    }
-    if (!validCells->size) {
-        free(validCells);
-        return NULL;
     }
     return validCells;
 }
 
-List* getValidCellsToSpawnUnit(const GameData* gameData, const EntityType unit) {
+bool hasValidCellsToBuild(const GameDataExtended* gameDataEx) {
+    const GameData *gameData = &gameDataEx->gameData;
+    for (int16_t y = 0; y < 17; y++) {
+        for (int16_t x = 0; x < 26; x++) {
+            if (gameData->board[y][x].entityType != EMPTY_CELL) continue;
+            if (canBuildAtCoordinate(gameDataEx, (Int16Vector2){x, y})) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+List getValidCellsToSpawnUnit(const GameData* gameData, const EntityType unit) {
+    List validCells = List_init();
     EntityType requiredBuilding;
     switch (unit) {
         case INFANTRY:
@@ -134,9 +143,8 @@ List* getValidCellsToSpawnUnit(const GameData* gameData, const EntityType unit) 
             requiredBuilding = ARMOURY;
             break;
         default:
-            return NULL;
+            return validCells;
     }
-    List *validCells = createList();
     for (int16_t y = 0; y < 17; y++) {
         for (int16_t x = 0; x < 26; x++) {
             const GameBoardCell *cell = &gameData->board[y][x];
@@ -146,76 +154,60 @@ List* getValidCellsToSpawnUnit(const GameData* gameData, const EntityType unit) 
                 Int16Vector2 *cln = malloc(sizeof(Int16Vector2));
                 cln->x = (int16_t)x - 1;
                 cln->y = y;
-                List_push(validCells, cln);
+                List_append(&validCells, cln);
             }
             if (x < 25 && canUnitStepOnCell(&gameData->board[y][x + 1])) {
                 Int16Vector2 *crn = malloc(sizeof(Int16Vector2));
                 crn->x = (int16_t)x + 1;
                 crn->y = y;
-                List_push(validCells, crn);
+                List_append(&validCells, crn);
             }
             if (y > 0 && canUnitStepOnCell(&gameData->board[y - 1][x])) {
                 Int16Vector2 *ctn = malloc(sizeof(Int16Vector2));
                 ctn->x = x;
                 ctn->y = (int16_t)y - 1;
-                List_push(validCells, ctn);
+                List_append(&validCells, ctn);
             }
             if (y < 16 && canUnitStepOnCell(&gameData->board[y + 1][x])) {
                 Int16Vector2 *cbn = malloc(sizeof(Int16Vector2));
                 cbn->x = x;
                 cbn->y = (int16_t)y + 1;
-                List_push(validCells, cbn);
+                List_append(&validCells, cbn);
             }
             if (x > 0 && y > 0 &&  canUnitStepOnCell(&gameData->board[y - 1][x - 1])) {
                 Int16Vector2 *ctln = malloc(sizeof(Int16Vector2));
                 ctln->x = (int16_t)x - 1;
                 ctln->y = (int16_t)y - 1;
-                List_push(validCells, ctln);
+                List_append(&validCells, ctln);
             }
             if (x > 0 && y < 16 && canUnitStepOnCell(&gameData->board[y + 1][x - 1])) {
                 Int16Vector2 *ctrn = malloc(sizeof(Int16Vector2));
                 ctrn->x = (int16_t)x - 1;
                 ctrn->y = (int16_t)y + 1;
-                List_push(validCells, ctrn);
+                List_append(&validCells, ctrn);
             }
             if (x < 25 && y > 0 && canUnitStepOnCell(&gameData->board[y - 1][x + 1])) {
                 Int16Vector2 *cbln = malloc(sizeof(Int16Vector2));
                 cbln->x = (int16_t)x + 1;
                 cbln->y = (int16_t)y - 1;
-                List_push(validCells, cbln);
+                List_append(&validCells, cbln);
             }
             if (x < 25 && y < 16 && canUnitStepOnCell(&gameData->board[y + 1][x + 1])) {
                 Int16Vector2 *cbrn = malloc(sizeof(Int16Vector2));
                 cbrn->x = (int16_t)x + 1;
                 cbrn->y = (int16_t)y + 1;
-                List_push(validCells, cbrn);
+                List_append(&validCells, cbrn);
             }
         }
-    }
-    if (!validCells->size) {
-        free(validCells);
-        return NULL;
     }
     return validCells;
 }
 
-bool hasValidCellsToBuild(const GameData* gameData) {
-    for (int16_t y = 0; y < 17; y++) {
-        for (int16_t x = 0; x < 26; x++) {
-            if (gameData->board[y][x].entityType != EMPTY_CELL) continue;
-            if (canBuildAtCoordinate(gameData, (Int16Vector2){x, y})) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 uint16_t getNumberOfMines(const GameData* gameData, const uint8_t player) {
     uint16_t minesCount = 0;
-    for (int i = 0; i < 17; i++) {
-        for (int j = 0; j < 26; j++) {
-            const GameBoardCell cell = gameData->board[i][j];
+    for (int y = 0; y < 17; y++) {
+        for (int x = 0; x < 26; x++) {
+            const GameBoardCell cell = gameData->board[y][x];
             if (cell.owner == player && cell.entityType == MINES) {
                 ++minesCount;
             }
@@ -274,13 +266,15 @@ bool createEntity(GameBoardCell* cell, Player* player, const EntityType entityTy
     return true;
 }
 
-void advanceTurn(GameData* gameData) {
+void advanceTurn(GameDataExtended* gameDataEx) {
     // Change to next player.
-    gameData->currentPlayerTurn = ++gameData->currentPlayerTurn % 2;
-    if (gameData->currentPlayerTurn == 0) ++gameData->currentRound;
+    gameDataEx->gameData.currentPlayerTurn = ++gameDataEx->gameData.currentPlayerTurn % 2;
+    gameDataEx->currentPlayer = &gameDataEx->gameData.players[gameDataEx->gameData.currentPlayerTurn];
+    gameDataEx->currentPlayerBaseCoord = getPlayerBaseCoordinate(&gameDataEx->gameData, gameDataEx->gameData.currentPlayerTurn);
+    if (gameDataEx->gameData.currentPlayerTurn == 0) ++gameDataEx->gameData.currentRound;
     // Add Castar Coins based on the player's number of mines.
-    const uint16_t playerMinesCount = getNumberOfMines(gameData, gameData->currentPlayerTurn);
-    if (playerMinesCount) CurrentPlayer(gameData).coins += playerMinesCount * getGameSettings()->MINE_INCOME;
+    const uint16_t playerMinesCount = getNumberOfMines(&gameDataEx->gameData, gameDataEx->gameData.currentPlayerTurn);
+    if (playerMinesCount) gameDataEx->currentPlayer->coins += playerMinesCount * getGameSettings()->MINE_INCOME;
 }
 
 char* getCellStrRepr(const GameData* gameData, const GameBoardCell* cell) {
@@ -310,7 +304,7 @@ char* getCellStrRepr(const GameData* gameData, const GameBoardCell* cell) {
 void printGameCell(const GameData* gameData, const GameBoardCell* cell, const bool darken) {
     // If the cell is not empty but it has no owner, something went wrong.
     assert(!(cell->entityType != EMPTY_CELL && cell->owner == NO_OWNER));
-    const Color terrainColor = getTerrainBackgroundColor(cell->terrainType);
+    const uint32_t terrainColor = getTerrainBackgroundColor(cell->terrainType);
     setBackgroundColor(darken ? darkenColor(terrainColor, 0.25f) : terrainColor);
     if (cell->owner != NO_OWNER) {
         setForegroundColor(gameData->players[cell->owner].isMordor ? C_MORDOR : C_GONDOR);
@@ -387,9 +381,37 @@ void printGameBoard(const GameData* gameData) {
     printf("───╯\n");
 }
 
-void printUnitList(GameData* gameData) {
+void printUnitInUnitList(const GameBoardCell* cell) {
     setCursorVerticalHorizontalPosition(2, 109);
-    drawBoxWithTitleAndFooter("Units", NULL, 26, 35, drawRoundedBox);
+}
+
+void printUnitList(const GameDataExtended* gameDataEx, const int8_t mode) {
+    setCursorVerticalHorizontalPosition(2, 109);
+    drawBoxWithTitleAndFooter(mode == 0 ? "Buildings and Units" : mode == 1 ? "Buildings" : "Units", NULL, 26, 35, drawRoundedBox);
+    if (mode == 0 || mode == 1) {
+        const Int16Vector2 baseCoord = gameDataEx->currentPlayerBaseCoord;
+        printUnitInUnitList(&gameDataEx->gameData.board[baseCoord.y][baseCoord.x]);
+        for (int y = 0; y < 17; y++) {
+            for (int x = 0; x < 26; x++) {
+                const GameBoardCell *cell = &gameDataEx->gameData.board[y][x];
+                if (cell->owner != gameDataEx->gameData.currentPlayerTurn) continue;
+                if (cell->entityType >= MINES && cell->entityType <= ARMOURY) {
+                    printUnitInUnitList(cell);
+                }
+            }
+        }
+    }
+    if (mode == 0 || mode == 2) {
+        for (int y = 0; y < 17; y++) {
+            for (int x = 0; x < 26; x++) {
+                const GameBoardCell *cell = &gameDataEx->gameData.board[y][x];
+                if (cell->owner != gameDataEx->gameData.currentPlayerTurn) continue;
+                if (cell->entityType >= INFANTRY && cell->entityType <= ARTILLERY) {
+                    printUnitInUnitList(cell);
+                }
+            }
+        }
+    }
 }
 
 void clearTurnInfoBox(void) {
@@ -406,9 +428,9 @@ void clearActionsMenu(void) {
     }
 }
 
-bool isValidCell(const Int16Vector2 cellCoord, const List* validCells) {
-    Node *e = validCells->head;
-    while (e != NULL) {
+bool isValidCell(const Int16Vector2 cellCoord, const List validCells) {
+    Node *e = validCells.head;
+    while (e) {
         const Int16Vector2 *eData = e->data;
         if (eData->x == cellCoord.x && eData->y == cellCoord.y) return true;
         e = e->next;
@@ -416,9 +438,9 @@ bool isValidCell(const Int16Vector2 cellCoord, const List* validCells) {
     return false;
 }
 
-void darkenValidCells(const GameData* gameData, const List* validCells) {
-    Node *e = validCells->head;
-    for (size_t i = 0; i < validCells->size; i++) {
+void darkenValidCells(const GameData* gameData, const List validCells) {
+    Node *e = validCells.head;
+    while (e) {
         const Int16Vector2 *eData = e->data;
         setCursorVerticalHorizontalPosition(1 + 2 * (eData->y + 1), 4 * (eData->x + 1));
         printGameCell(gameData, &gameData->board[eData->y][eData->x], true);
@@ -427,9 +449,9 @@ void darkenValidCells(const GameData* gameData, const List* validCells) {
     resetBackgroundColor();
 }
 
-void unDarkenValidCells(const GameData* gameData, const List* validCells) {
-    Node *e = validCells->head;
-    for (size_t i = 0; i < validCells->size; i++) {
+void unDarkenValidCells(const GameData* gameData, const List validCells) {
+    Node *e = validCells.head;
+    while (e) {
         const Int16Vector2 *eData = e->data;
         setCursorVerticalHorizontalPosition(1 + 2 * (eData->y + 1), 4 * (eData->x + 1));
         printGameCell(gameData, &gameData->board[eData->y][eData->x], false);
@@ -438,12 +460,12 @@ void unDarkenValidCells(const GameData* gameData, const List* validCells) {
     resetBackgroundColor();
 }
 
-GameBoardCell* getSelectedGameBoardCell(GameData* gameData, Int16Vector2* currentCoord, const List* validCells) {
-    darkenValidCells(gameData, validCells);
+GameBoardCell* getSelectedGameBoardCell(GameDataExtended* gameDataEx, Int16Vector2* currentCoord, const List validCells) {
+    darkenValidCells(&gameDataEx->gameData, validCells);
     bool isSelectedCellValid;
     int ch;
     do {
-        const GameBoardCell *currentCell = &gameData->board[currentCoord->y][currentCoord->x];
+        const GameBoardCell *currentCell = &gameDataEx->gameData.board[currentCoord->y][currentCoord->x];
         setCursorVerticalHorizontalPosition(1 + 2 * (currentCoord->y + 1), 4 * (currentCoord->x + 1));
         enableBlinking();
         if ((isSelectedCellValid = isValidCell(*currentCoord, validCells))) {
@@ -478,21 +500,21 @@ GameBoardCell* getSelectedGameBoardCell(GameData* gameData, Int16Vector2* curren
                 break;
         }
         setCursorVerticalHorizontalPosition(1 + 2 * (previousCoord.y + 1), 4 * (previousCoord.x + 1));
-        printGameCell(gameData, &gameData->board[previousCoord.y][previousCoord.x], isValidCell(previousCoord, validCells));
+        printGameCell(&gameDataEx->gameData, &gameDataEx->gameData.board[previousCoord.y][previousCoord.x], isValidCell(previousCoord, validCells));
         resetBackgroundColor();
         if (ch == KEY_ESC) {
-            unDarkenValidCells(gameData, validCells);
+            unDarkenValidCells(&gameDataEx->gameData, validCells);
             return NULL;
         }
         currentCoord->x = (int16_t)((currentCoord->x + 26) % 26);
         currentCoord->y = (int16_t)((currentCoord->y + 17) % 17);
     } while ((ch != KEY_ENTER && ch != KEY_SPACE) || !isSelectedCellValid);
-    unDarkenValidCells(gameData, validCells);
-    return &gameData->board[currentCoord->y][currentCoord->x];
+    unDarkenValidCells(&gameDataEx->gameData, validCells);
+    return &gameDataEx->gameData.board[currentCoord->y][currentCoord->x];
 }
 
 int32_t makeActionMenu(
-    const GameData* gameData,
+    const GameDataExtended* gameDataEx,
     const char* title,
     const char* footer,
     ActionMenuOption menuOptions[],
@@ -507,7 +529,7 @@ int32_t makeActionMenu(
         setCursorVerticalHorizontalPosition(38 + menuOptions[i].row * 2, menuOptions[i].consoleColumn);
         printf("  %s", menuOptions[i].text);
         if (menuOptions[i].castarCoinCost > 0) {
-            setForegroundColor(menuOptions[i].castarCoinCost > CurrentPlayer(gameData).coins ? RED : GREEN);
+            setForegroundColor(menuOptions[i].castarCoinCost > gameDataEx->currentPlayer->coins ? RED : GREEN);
             printf(" (₵%d)", menuOptions[i].castarCoinCost);
             resetForegroundColor();
         }
@@ -544,7 +566,7 @@ int32_t makeActionMenu(
         currentSelection = (currentSelection + numberOfOptions) % numberOfOptions;
         if (selection != NULL) *selection = currentSelection;
         if (menuOptions[currentSelection].castarCoinCost > 0) {
-            canAffordSelection = menuOptions[currentSelection].castarCoinCost <= CurrentPlayer(gameData).coins;
+            canAffordSelection = menuOptions[currentSelection].castarCoinCost <= gameDataEx->currentPlayer->coins;
         }
         setCursorVerticalHorizontalPosition(38 + menuOptions[previousSelection].row * 2, menuOptions[previousSelection].consoleColumn);
         printf("  %s", menuOptions[previousSelection].text);
@@ -561,8 +583,8 @@ int32_t openExitGameMenu(void) {
     }, 4, NULL);
 }
 
-int32_t openCreateBuildingMenu(GameData* gameData) {
-    if (!hasValidCellsToBuild(gameData)) {
+int32_t openCreateBuildingMenu(GameDataExtended* gameDataEx) {
+    if (!hasValidCellsToBuild(gameDataEx)) {
         clearActionsMenu();
         setCursorVerticalHorizontalPosition(37, 3);
         drawBoxWithTitleAndFooter("Build...", MENU_FOOTER_GO_BACK, 105, 9, drawRoundedBox);
@@ -570,7 +592,7 @@ int32_t openCreateBuildingMenu(GameData* gameData) {
         setForegroundColor(RED);
         printf("No land space available to build on.");
         resetForegroundColor();
-        while (_getch() != KEY_ESC);
+        while (_getch() != KEY_ESC) {}
         return MENU_BACK;
     }
     const GameSettings *gameSettings = getGameSettings();
@@ -580,9 +602,9 @@ int32_t openCreateBuildingMenu(GameData* gameData) {
         {"Stables", gameSettings->STABLES_COST, 1, 42},
         {"Armoury", gameSettings->ARMOURY_COST, 2, 42}
     };
-    const int32_t selection = makeActionMenu(gameData, "Build...", MENU_FOOTER_GO_BACK, actionMenu, 4, NULL);
+    const int32_t selection = makeActionMenu(gameDataEx, "Build...", MENU_FOOTER_GO_BACK, actionMenu, 4, NULL);
     if (selection == MENU_BACK) return selection;
-    List *validCells = getValidCellsToBuild(gameData);
+    List validCells = getValidCellsToBuild(gameDataEx);
     const EntityType selectedBuilding = selection + 2;
     clearActionsMenu();
     setCursorVerticalHorizontalPosition(37, 3);
@@ -594,30 +616,30 @@ int32_t openCreateBuildingMenu(GameData* gameData) {
     printf("Navigate the map with the arrow keys or WASD to choose where you want to build.");
     setCursorVerticalHorizontalPosition(42, 12);
     printf("Press SPACE or ENTER to confirm the location.");
-    Int16Vector2 selectedCellCoord = getPlayerBaseCoordinate(gameData, &CurrentPlayer(gameData));
-    GameBoardCell* selectedCell = getSelectedGameBoardCell(gameData, &selectedCellCoord, validCells);
-    freeList(validCells);
-    if (selectedCell == NULL) return openCreateBuildingMenu(gameData); // If it's NULL, the user must have pressed ESC.
-    createEntity(selectedCell, &CurrentPlayer(gameData), selectedBuilding);
+    Int16Vector2 selectedCellCoord = gameDataEx->currentPlayerBaseCoord;
+    GameBoardCell* selectedCell = getSelectedGameBoardCell(gameDataEx, &selectedCellCoord, validCells);
+    List_clear(&validCells);
+    if (selectedCell == NULL) return openCreateBuildingMenu(gameDataEx); // If it's NULL, the user must have pressed ESC.
+    createEntity(selectedCell, gameDataEx->currentPlayer, selectedBuilding);
     setCursorVerticalHorizontalPosition(1 + 2 * (selectedCellCoord.y + 1), 4 * (selectedCellCoord.x + 1));
-    printGameCell(gameData, selectedCell, false);
+    printGameCell(&gameDataEx->gameData, selectedCell, false);
     resetBackgroundColor();
     return selection;
 }
 
-int32_t openSpawnUnitMenu(GameData* gameData) {
-    const Player *currentPlayer = &CurrentPlayer(gameData);
+int32_t openSpawnUnitMenu(GameDataExtended* gameDataEx) {
+    const bool playerIsMordor = gameDataEx->currentPlayer->isMordor;
     const GameSettings *gameSettings = getGameSettings();
     const ActionMenuOption menuOptions[] = {
-        {currentPlayer->isMordor ? "Orc Warriors (Infantry)" : "Gondorian Guards (Infantry)", gameSettings->INFANTRY_SPAWN_COST, 1, 10},
-        {currentPlayer->isMordor ? "Wargs (Cavalry)" : "Swan-Knights (Cavalry)", gameSettings->CAVALRY_SPAWN_COST, 2, 10},
-        {currentPlayer->isMordor ? "Siege Towers (Artillery)" : "Trebuchets (Artillery)", gameSettings->ARTILLERY_SPAWN_COST, 1, 60}
+        {playerIsMordor ? "Orc Warriors (Infantry)" : "Gondorian Guards (Infantry)", gameSettings->INFANTRY_SPAWN_COST, 1, 10},
+        {playerIsMordor ? "Wargs (Cavalry)" : "Swan-Knights (Cavalry)", gameSettings->CAVALRY_SPAWN_COST, 2, 10},
+        {playerIsMordor ? "Siege Towers (Artillery)" : "Trebuchets (Artillery)", gameSettings->ARTILLERY_SPAWN_COST, 1, 60}
     };
     const char *buildingRequirements[] = {"Barracks", "Stables", "Armoury"};
-    List *unitValidCells[] = {
-        getValidCellsToSpawnUnit(gameData, INFANTRY),
-        getValidCellsToSpawnUnit(gameData, CAVALRY),
-        getValidCellsToSpawnUnit(gameData, ARTILLERY)
+    List unitValidCells[] = {
+        getValidCellsToSpawnUnit(&gameDataEx->gameData, INFANTRY),
+        getValidCellsToSpawnUnit(&gameDataEx->gameData, CAVALRY),
+        getValidCellsToSpawnUnit(&gameDataEx->gameData, ARTILLERY)
     };
     clearActionsMenu();
     setCursorVerticalHorizontalPosition(37, 3);
@@ -627,7 +649,7 @@ int32_t openSpawnUnitMenu(GameData* gameData) {
         setCursorVerticalHorizontalPosition(38 + menuOptions[i].row * 2, menuOptions[i].consoleColumn);
         printf("  %s", menuOptions[i].text);
         if (menuOptions[i].castarCoinCost > 0) {
-            setForegroundColor(menuOptions[i].castarCoinCost > CurrentPlayer(gameData).coins ? RED : GREEN);
+            setForegroundColor(menuOptions[i].castarCoinCost > gameDataEx->currentPlayer->coins ? RED : GREEN);
             printf(" (₵%d)", menuOptions[i].castarCoinCost);
             resetForegroundColor();
         }
@@ -635,7 +657,7 @@ int32_t openSpawnUnitMenu(GameData* gameData) {
     bool canAffordSelection = true, unitHasValidCells;
     int ch;
     do {
-        unitHasValidCells = unitValidCells[currentSelection] != NULL;
+        unitHasValidCells = unitValidCells[currentSelection].length;
         if (!unitHasValidCells) {
             setForegroundColor(RED);
             setCursorVerticalHorizontalPosition(38 + 2 * 2, 60);
@@ -676,15 +698,14 @@ int32_t openSpawnUnitMenu(GameData* gameData) {
         }
         currentSelection = (currentSelection + 3) % 3;
         if (menuOptions[currentSelection].castarCoinCost > 0) {
-            canAffordSelection = menuOptions[currentSelection].castarCoinCost <= CurrentPlayer(gameData).coins;
+            canAffordSelection = menuOptions[currentSelection].castarCoinCost <= gameDataEx->currentPlayer->coins;
         }
         setCursorVerticalHorizontalPosition(38 + menuOptions[previousSelection].row * 2, menuOptions[previousSelection].consoleColumn);
         printf("  %s", menuOptions[previousSelection].text);
     } while ((ch != KEY_ENTER && ch != KEY_SPACE) || !canAffordSelection || !unitHasValidCells);
-    
     if (currentSelection == MENU_BACK) {
         for (int i = 0; i < 3; i++) {
-            if (unitValidCells[i] != NULL) freeList(unitValidCells[i]);
+            List_clear(&unitValidCells[i]);
         }
         return currentSelection;
     }
@@ -699,21 +720,26 @@ int32_t openSpawnUnitMenu(GameData* gameData) {
     printf("Navigate the map with the arrow keys or WASD to choose where you want to spawn the unit.");
     setCursorVerticalHorizontalPosition(42, 12);
     printf("Press SPACE or ENTER to confirm the location.");
-    Int16Vector2 selectedCellCoord = getPlayerBaseCoordinate(gameData, &CurrentPlayer(gameData));
-    GameBoardCell* selectedCell = getSelectedGameBoardCell(gameData, &selectedCellCoord, unitValidCells[currentSelection]);
+    Int16Vector2 selectedCellCoord = gameDataEx->currentPlayerBaseCoord;
+    GameBoardCell* selectedCell = getSelectedGameBoardCell(gameDataEx, &selectedCellCoord, unitValidCells[currentSelection]);
     for (int i = 0; i < 3; i++) {
-        if (unitValidCells[i] != NULL) freeList(unitValidCells[i]);
+        List_clear(&unitValidCells[i]);
     }
-    if (selectedCell == NULL) return openSpawnUnitMenu(gameData); // If it's NULL, the user must have pressed ESC.
-    createEntity(selectedCell, &CurrentPlayer(gameData), selectedUnit);
+    if (selectedCell == NULL) return openSpawnUnitMenu(gameDataEx); // If it's NULL, the user must have pressed ESC.
+    createEntity(selectedCell, gameDataEx->currentPlayer, selectedUnit);
     setCursorVerticalHorizontalPosition(1 + 2 * (selectedCellCoord.y + 1), 4 * (selectedCellCoord.x + 1));
-    printGameCell(gameData, selectedCell, false);
+    printGameCell(&gameDataEx->gameData, selectedCell, false);
     resetBackgroundColor();
     return currentSelection;
 }
 
-int32_t openMainActionsMenu(const GameData* gameData, int32_t* currentSelection) {
-    return makeActionMenu(gameData, "Actions", NULL, (ActionMenuOption[]){
+int32_t openSelectBuildingMenu(GameDataExtended* gameDataEx) {
+    // TODO: Implement Select Building
+    return MENU_BACK;
+}
+
+int32_t openMainActionsMenu(const GameDataExtended* gameDataEx, int32_t* currentSelection) {
+    return makeActionMenu(gameDataEx, "Actions", NULL, (ActionMenuOption[]){
         {"Build", 0, 1, 10},
         {"Spawn Unit", 0, 2, 10},
         {"Select Building", 0, 1, 42},
@@ -723,52 +749,55 @@ int32_t openMainActionsMenu(const GameData* gameData, int32_t* currentSelection)
     }, 6, currentSelection);
 }
 
-void printTurnInfoBox(const GameData* gameData) {
+void printTurnInfoBox(const GameDataExtended* gameDataEx) {
     clearTurnInfoBox();
     setCursorVerticalHorizontalPosition(37, 109);
-    char *roundInfo = malloc((getNumDigits((int32_t)gameData->currentRound + 1) + 7) * sizeof(char));
-    (void)sprintf(roundInfo, "Round %d", gameData->currentRound + 1);
+    char *roundInfo = malloc((getNumDigits((int32_t)gameDataEx->gameData.currentRound + 1) + 7) * sizeof(char));
+    (void)sprintf(roundInfo, "Round %d", gameDataEx->gameData.currentRound + 1);
     drawBoxWithTitleAndFooter(roundInfo, NULL, 26, 9, drawRoundedBox);
     free(roundInfo);
     setCursorVerticalHorizontalPosition(39, 118);
-    printf("Player %d", gameData->currentPlayerTurn + 1);
-    const char *currentPlayerName = CurrentPlayer(gameData).name;
+    printf("Player %d", gameDataEx->gameData.currentPlayerTurn + 1);
+    const char *currentPlayerName = gameDataEx->currentPlayer->name;
     setCursorVerticalHorizontalPosition(40, 109 + (uint16_t)(26 - strlen(currentPlayerName)) / 2);
     printf("%s", currentPlayerName);
     setCursorVerticalHorizontalPosition(42, 116);
-    const int32_t playerCoins = CurrentPlayer(gameData).coins;
+    const int32_t playerCoins = gameDataEx->currentPlayer->coins;
     printf("Castar Coins");
     setCursorVerticalHorizontalPosition(43, 122 - (max(3, (uint16_t)getNumDigits(playerCoins)) + 2) / 2);
     printf("₵%3d", playerCoins);
 }
 
-void Game(GameData* gameData) {
-    printGameBoard(gameData);
-    while (!gameData->isGameOver) {
-        printUnitList(gameData);
-        printTurnInfoBox(gameData);
+void Game(GameDataExtended* gameDataEx) {
+    printGameBoard(&gameDataEx->gameData);
+    while (!gameDataEx->gameData.isGameOver) {
+        gameDataEx->currentPlayer = &gameDataEx->gameData.players[gameDataEx->gameData.currentPlayerTurn];
+        gameDataEx->currentPlayerBaseCoord = getPlayerBaseCoordinate(&gameDataEx->gameData, gameDataEx->gameData.currentPlayerTurn);
+        printUnitList(gameDataEx, 0);
+        printTurnInfoBox(gameDataEx);
         int32_t currentSelection = 0;
         while (true) {
-            const int32_t action = openMainActionsMenu(gameData, &currentSelection);
+            const int32_t action = openMainActionsMenu(gameDataEx, &currentSelection);
             if (action == 0) {
-                openCreateBuildingMenu(gameData);
+                openCreateBuildingMenu(gameDataEx);
                 break;
             } else if (action == 1) {
-                openSpawnUnitMenu(gameData);
+                openSpawnUnitMenu(gameDataEx);
                 break;
             } else if (action == 2) {
-                // TODO: Implement Select Building
+                openSelectBuildingMenu(gameDataEx);
+                break;
             } else if (action == 3) {
                 // TODO: Implement Select Unit
             } else if (action == 4) {
-                advanceTurn(gameData);
+                advanceTurn(gameDataEx);
                 break;
             } else {
                 const int32_t exitResult = openExitGameMenu();
                 switch (exitResult) {
                     case 0:
                     case 1:
-                        // saveGame(gameData);
+                        // saveGame(gameDataEx);
                         break;
                 }
                 switch (exitResult) {
@@ -782,7 +811,7 @@ void Game(GameData* gameData) {
                 }
             }
         }
-        // if (CurrentPlayer(gameData).coins <= 0) advanceTurn(gameData);
+        // if (gameDataEx->currentPlayer.coins <= 0) advanceTurn(gameDataEx);
     }
 }
 
@@ -839,36 +868,46 @@ void createBoardFromMapFile(char* mapFileName, GameData* gameData) {
 }
 
 void startNewSinglePlayerGame(char* mapFile, const char* playerName, const bool player1IsMordor) {
-    GameData gameData = {
-        time(NULL),
-        0,
+    GameDataExtended gameDataEx = {
         {
-            {0, "Player 1", 100, player1IsMordor, false },
-            {1, "CPU", 100, !player1IsMordor, true }
+            time(NULL),
+            0,
+            {
+                {0, "Player 1", 100, player1IsMordor, false },
+                {1, "CPU", 100, !player1IsMordor, true }
+            },
+            0,
+            false,
+            {{{PLAIN, EMPTY_CELL, NO_OWNER, 0}}}
         },
-        0,
-        false,
-        {{{PLAIN, EMPTY_CELL, NO_OWNER, 0}}}
+        NULL,
+        {0, 0},
+        List_init()
     };
-    createBoardFromMapFile(mapFile, &gameData);
-    strcpy(gameData.players[0].name, playerName);
-    Game(&gameData);
+    createBoardFromMapFile(mapFile, &gameDataEx.gameData);
+    strcpy(gameDataEx.gameData.players[0].name, playerName);
+    Game(&gameDataEx);
 }
 
 void startNewMultiplayerGame(char* mapFile, const char* player1Name, const char* player2Name, const bool player1IsMordor) {
-    GameData gameData = {
-        time(NULL),
-        0,
+    GameDataExtended gameDataEx = {
         {
-            {0, "Player 1", 100, player1IsMordor, false },
-            {1, "Player 2", 100, !player1IsMordor, false }
+            time(NULL),
+            0,
+            {
+                    {0, "Player 1", 100, player1IsMordor, false },
+                    {1, "Player 2", 100, !player1IsMordor, false }
+            },
+            0,
+            false,
+            {{{PLAIN, EMPTY_CELL, NO_OWNER, 0}}}
         },
-        0,
-        false,
-        {{{PLAIN, EMPTY_CELL, NO_OWNER, 0}}}
+        NULL,
+        {0, 0},
+        List_init()
     };
-    createBoardFromMapFile(mapFile, &gameData);
-    strcpy(gameData.players[0].name, player1Name);
-    strcpy(gameData.players[1].name, player2Name);
-    Game(&gameData);
+    createBoardFromMapFile(mapFile, &gameDataEx.gameData);
+    strcpy(gameDataEx.gameData.players[0].name, player1Name);
+    strcpy(gameDataEx.gameData.players[1].name, player2Name);
+    Game(&gameDataEx);
 }

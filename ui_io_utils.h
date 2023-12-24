@@ -22,21 +22,8 @@ typedef enum {
 typedef enum {
     BLACK = 0x000000,
     WHITE = 0xFFFFFF,
-    RED = 231 << 16 | 72 << 8 | 86, // 0xE74856
-    GREEN = 0x98C379,
-    // Player Colors
-    C_GONDOR = 0x213B79,
-    C_MORDOR = 0xE74856,
-    // Terrain Colors
-    C_PLAIN = 0x84FF70,
-    C_FOREST = 0x288440,
-    C_MOUNTAIN = 0xACACAC,
-    C_RIVER = 0x213B79,
-    C_WATER = 0x62CBF7,
-    C_BRIDGE = 0xAC8B4A,
-    C_SNOW = 0xFFFFFF,
-    C_LAVA = 0xE95F1A,
-    C_BASALT = 0x33292D
+    RED = 0xE74856,
+    GREEN = 0x98C379
 } Color;
 
 typedef struct {
@@ -51,15 +38,94 @@ typedef struct {
     const uint16_t consoleColumn;
 } ActionMenuOption;
 
+/**
+ * Darkens a given color by a specified factor.
+ * 
+ * @param color The original color in 24-bit RGB format.
+ * @param darkenFactor The factor by which to darken the color (0.0 to 1.0).
+ * @return The darkened color.
+ */
 uint32_t darkenColor(const uint32_t color, float darkenFactor);
 
+/**
+ * Prints a given string centered on the console.
+ * 
+ * @param str The string to be printed.
+ */
 void printCenteredText(const char* str);
 
+/**
+ * Prints a full-width, single line, box with a title inside.
+ * 
+ * @param title The text to print inside the box.
+ */
 void drawFullWidthBoxTitle(const char* title);
-void drawRoundedBox(const uint16_t width, const uint16_t height);
-void drawBoldBox(const uint16_t width, const uint16_t height);
-void drawBox(const uint16_t width, const uint16_t height);
-void drawBoxWithTitleAndFooter(const char* title, const char* footer, const uint16_t width, const uint16_t height, void (*boxDrawingFunc)(const uint16_t, const uint16_t));
 
+/**
+ * Prints a box with rounded corners at the current position with the given width and height.
+ * 
+ * @param width The width of the box.
+ * @param height The height of the box.
+ */
+void drawRoundedBox(const uint16_t width, const uint16_t height);
+
+/**
+ * Prints a box with thicker lines at the current position with the given width and height.
+ * 
+ * @param width The width of the box.
+ * @param height The height of the box.
+ */
+void drawBoldBox(const uint16_t width, const uint16_t height);
+
+/**
+ * Prints a box at the current position with the given width and height.
+ * 
+ * @param width The width of the box.
+ * @param height The height of the box.
+ */
+void drawBox(const uint16_t width, const uint16_t height);
+
+/**
+ * Prints a box at the current position with the given title, footer, width, and height.
+ * 
+ * @param title The title of the box.
+ * @param footer The footer of the box.
+ * @param width The width of the box.
+ * @param height The height of the box.
+ * @param boxDrawingFunc The box drawing function to call.
+ */
+void drawBoxWithTitleAndFooter(
+    const char* title,
+    const char* footer,
+    const uint16_t width,
+    const uint16_t height,
+    void (*boxDrawingFunc)(const uint16_t, const uint16_t)
+);
+
+/**
+ * Reads a line from stdin and stores it in the string pointed to by `str`.
+ * The function reads at most `maxSize` characters from the input stream, including the terminating null byte ('\0').
+ * If `str` is NULL, the function returns NULL.
+ * If an error occurs, the function returns NULL.
+ * Otherwise, the function returns `str`.
+ *
+ * If `allowEmpty` is true, the function reads the line even if it is empty.
+ * Otherwise, the function reads the line only if it is not empty and does not start with a space character.
+ * If the line is empty or starts with a space character, the function clears the input buffer and reads the line again.
+ *
+ * @param str Pointer to the buffer where the line read is stored.
+ * @param maxSize Maximum number of characters to be read (including the final null-character).
+ * @param allowEmpty Flag indicating whether to allow empty lines.
+ * @return Pointer to the buffer where the line read is stored.
+ */
 char* readLine(char* str, const size_t maxSize, const bool allowEmpty);
+
+/**
+ * Reads a line from a file and returns it as a string (char*).
+ *
+ * @param fp A pointer to the file to read from.
+ * @return Pointer to the buffer where the line read is stored.
+ *         The string must be freed by the caller.
+ *         Returns NULL if the file pointer is NULL or if an error occurs.
+ */
 char* fReadLine(FILE* fp);

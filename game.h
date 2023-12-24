@@ -1,6 +1,9 @@
 #pragma once
 #include <stdint.h>
 
+#include "math_utils.h"
+#include "linked_list.h"
+
 #define NO_OWNER _UI8_MAX // 255 / 0xFF
 
 typedef enum {
@@ -14,6 +17,22 @@ typedef enum {
     LAVA,
     BASALT
 } TerrainType;
+
+typedef enum {
+    // Player Colors
+    C_GONDOR = 0x213B79,
+    C_MORDOR = 0xE74856,
+    // Terrain Colors
+    C_PLAIN = 0x84FF70,
+    C_FOREST = 0x288440,
+    C_MOUNTAIN = 0xACACAC,
+    C_RIVER = 0x213B79,
+    C_WATER = 0x62CBF7,
+    C_BRIDGE = 0xAC8B4A,
+    C_SNOW = 0xFFFFFF,
+    C_LAVA = 0xE95F1A,
+    C_BASALT = 0x33292D
+} GameColor;
 
 typedef enum {
     EMPTY_CELL,
@@ -51,7 +70,12 @@ typedef struct {
     GameBoardCell board[17][26];
 } GameData;
 
-#define CurrentPlayer(gameData) ((gameData)->players[(gameData)->currentPlayerTurn])
+typedef struct {
+    GameData gameData;
+    Player* currentPlayer;
+    Int16Vector2 currentPlayerBaseCoord;
+    List currentUnitList;
+} GameDataExtended;
 
 typedef struct {
     uint16_t MINE_INCOME;
