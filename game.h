@@ -74,8 +74,17 @@ typedef struct {
     GameData gameData;
     Player* currentPlayer;
     Int16Vector2 currentPlayerBaseCoord;
-    List currentUnitList;
+    List currentPlayerBuildingsList;
+    List currentPlayerUnitsList;
 } GameDataExtended;
+
+typedef struct {
+    EntityType entityType;
+    uint16_t maxHealth;
+    uint16_t spawnCost;
+    uint16_t moveCost;
+    uint16_t attackPower;
+} EntityInfo;
 
 typedef struct {
     uint16_t MINE_INCOME;
@@ -114,6 +123,5 @@ extern GameSettings *GameSettings_Current;
 
 GameSettings* getGameSettings(void);
 
-void printGameBoard(const GameData* gameData);
 void startNewSinglePlayerGame(char* mapFile, const char* playerName, const bool player1IsMordor);
 void startNewMultiplayerGame(char* mapFile, const char* player1Name, const char* player2Name, const bool player1IsMordor);

@@ -29,6 +29,10 @@ static inline void clearCurrentLineFromCursorBackward(void) {
     printf("\x1B[1K");
 }
 
+static inline void clearFromCursorForward(const uint16_t length) {
+    printf("%*s\x1B[%dD", length,  "", length);
+}
+
 static inline void resetForegroundColor(void) {
     printf("\x1B[39m");
 }

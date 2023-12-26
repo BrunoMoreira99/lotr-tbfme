@@ -43,13 +43,13 @@ int loadMapList(char*** mapList) {
     *mapList = malloc(mapCount * sizeof(char*));
     for (int i = 0; i < mapCount; i++) {
         char *mapName = fReadLine(fp);
-        char* mapFileName = malloc(10 + strlen(mapName) * sizeof(char));
+        char* mapFileName = malloc(10 + strlen(mapName));
         (void)sprintf(mapFileName, "Maps\\%s.map", mapName);
         FILE *mapFile = fopen(mapFileName, "r");
         free(mapFileName);
         if (mapFile == NULL) {
+            // If we got here, then the map file does not exist.
             free(mapName);
-            // Check if the map file exists.
             --mapCount;
             --i;
             continue;
@@ -63,7 +63,7 @@ int loadMapList(char*** mapList) {
 
 void drawMapPreview(const char* mapName, const uint16_t row, const uint16_t column) {
     setCursorVerticalHorizontalPosition(row, column);
-    char* mapFileName = malloc(10 + strlen(mapName) * sizeof(char));
+    char* mapFileName = malloc(10 + strlen(mapName));
     (void)sprintf(mapFileName, "Maps\\%s.map", mapName);
     FILE *fp = fopen(mapFileName, "r");
     if (fp == NULL) return;
@@ -173,7 +173,7 @@ char* openMapSelector(void) {
             setForegroundColor(RED);
         } while (ch != KEY_ENTER && ch != KEY_SPACE);
     }
-    char* chosenMapFile = malloc(10 + strlen(mapList[currentSelection]) * sizeof(char));
+    char* chosenMapFile = malloc(10 + strlen(mapList[currentSelection]));
     (void)sprintf(chosenMapFile, "Maps\\%s.map", mapList[currentSelection]);
     for (int i = 0; i < mapCount; i++) {
         free(mapList[i]);

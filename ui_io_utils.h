@@ -2,8 +2,8 @@
 #include <stdint.h>
 
 #define MENU_BACK INT32_MAX
-#define MENU_FOOTER_GO_BACK "Press ESC to Go Back"
-#define MENU_FOOTER_CANCEL "Press ESC to Cancel"
+#define MENU_FOOTER_GO_BACK "Press [ESC] to Go Back"
+#define MENU_FOOTER_CANCEL "Press [ESC] to Cancel"
 
 typedef enum {
     KEY_ENTER = 13,
@@ -22,7 +22,9 @@ typedef enum {
 typedef enum {
     BLACK = 0x000000,
     WHITE = 0xFFFFFF,
+    DARK_GRAY = 0x666666,
     RED = 0xE74856,
+    YELLOW = 0xE5C07B,
     GREEN = 0x98C379
 } Color;
 
@@ -34,6 +36,7 @@ typedef struct {
 typedef struct {
     const char* text;
     const uint16_t castarCoinCost;
+    const bool disabled;
     const uint8_t row;
     const uint16_t consoleColumn;
 } ActionMenuOption;

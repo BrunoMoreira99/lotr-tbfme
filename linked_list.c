@@ -66,7 +66,7 @@ void List_clear(List* list) {
     Node *current_node = list->head;
     while (current_node != NULL) {
         Node *next_node = current_node->next;
-        free(current_node->data);
+        free(current_node->data); // This will crash if the data is not in the heap.
         free(current_node);
         current_node = next_node;
     }
