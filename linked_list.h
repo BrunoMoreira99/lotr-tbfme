@@ -34,7 +34,7 @@ void List_append(List* list, void* data);
  * @param index The index of the element to be removed.
  * @return A pointer to the data that was removed. The developer is responsible for freeing this memory.
  */
-void* List_pop(List* list, const size_t index);
+void* List_pop(List* list, size_t index);
 
 /**
  * Clears the list, removing and freeing all data.

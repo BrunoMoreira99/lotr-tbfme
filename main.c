@@ -77,39 +77,17 @@ void drawMapPreview(const char* mapName, const uint16_t row, const uint16_t colu
             continue;
         }
         switch (ch) {
-            case 'P':
-                setBackgroundColor(C_PLAIN);
-                break;
-            case 'F':
-                setBackgroundColor(C_FOREST);
-                break;
-            case 'M':
-                setBackgroundColor(C_MOUNTAIN);
-                break;
-            case 'R':
-                setBackgroundColor(C_RIVER);
-                break;
-            case 'W':
-                setBackgroundColor(C_WATER);
-                break;
-            case 'B':
-                setBackgroundColor(C_BRIDGE);
-                break;
-            case 'S':
-                setBackgroundColor(C_SNOW);
-                break;
-            case 'L':
-                setBackgroundColor(C_LAVA);
-                break;
-            case 'T':
-                setBackgroundColor(C_BASALT);
-                break;
-            case '#':
-                printf("\b\bP%d", ++player);
-                continue;
-            default:
-                resetBackgroundColor();
-                break;
+            case 'P': setBackgroundColor(C_PLAIN);        break;
+            case 'F': setBackgroundColor(C_FOREST);       break;
+            case 'M': setBackgroundColor(C_MOUNTAIN);     break;
+            case 'R': setBackgroundColor(C_RIVER);        break;
+            case 'W': setBackgroundColor(C_WATER);        break;
+            case 'B': setBackgroundColor(C_BRIDGE);       break;
+            case 'S': setBackgroundColor(C_SNOW);         break;
+            case 'L': setBackgroundColor(C_LAVA);         break;
+            case 'T': setBackgroundColor(C_BASALT);       break;
+            case '#': printf("\b\bP%d", ++player); continue;
+            default:  resetBackgroundColor();             break;
         }
         printf("  ");
     }
@@ -152,17 +130,12 @@ char* openMapSelector(void) {
             ch = _getch();
             if (ch == 0 || ch == 224) ch = _getch();
             switch (ch) {
-                case KEY_W:
-                case KEY_UP:
-                    --currentSelection;
-                    break;
-                case KEY_S:
-                case KEY_DOWN:
-                    ++currentSelection;
-                    break;
+                case KEY_W: case KEY_UP:   --currentSelection; break;
+                case KEY_S: case KEY_DOWN: ++currentSelection; break;
+                case KEY_ENTER: case KEY_SPACE: break;
+                default: continue;
             }
             currentSelection = (currentSelection + mapCount) % mapCount;
-            if (currentSelection == previousSelection) continue;
             setCursorVerticalHorizontalPosition(5 + (uint16_t)previousSelection * 2, 4);
             setForegroundColor(RED);
             printf("  %s", mapList[previousSelection]);
@@ -198,7 +171,7 @@ void openGameSetupSinglePlayer(void) {
     setForegroundColor(WHITE);
     readLine(playerName, 20, false);
     hideCursor();
-    char* chosenMapFile = openMapSelector();
+    const char* chosenMapFile = openMapSelector();
     clearConsole();
     startNewSinglePlayerGame(chosenMapFile, playerName, false);    
 }
@@ -224,7 +197,7 @@ void openGameSetupMultiPlayer(void) {
     setForegroundColor(WHITE);
     readLine(player2Name, 20, false);
     hideCursor();
-    char* chosenMapFile = openMapSelector();
+    const char* chosenMapFile = openMapSelector();
     clearConsole();
     startNewMultiplayerGame(chosenMapFile, player1Name, player2Name, false);    
 }
@@ -240,63 +213,49 @@ int8_t makeMenu(const MenuOption* menuOptions, const int8_t numberOfOptions, int
     for (int i = 0; i < numberOfOptions; i++) {
         setCursorVerticalPosition((uint16_t)(consoleMidRow + menuOptions[i].rowOffset));
         if (currentSelection == i) {
-            setForegroundColor(WHITE);
+            setForegroundColor(menuOptions[i].disabled ? DARK_GRAY : WHITE);
             printf("\x1B[%dG< %s >", (consoleWidth - ((int)strlen(menuOptions[i].text) + 4)) / 2, menuOptions[i].text);
         } else {
-            setForegroundColor(RED);
+            setForegroundColor(menuOptions[i].disabled ? DARK_GRAY : RED);
             printCenteredText(menuOptions[i].text);
         }
     }
     int ch;
     do {
         // Reprint the entire menu if the console was resized.
-        if (currentConsoleDimensions != getConsoleDimensions()) return makeMenu(menuOptions, numberOfOptions, currentSelection);
+        if (currentConsoleDimensions != getConsoleDimensions()) {
+            return makeMenu(menuOptions, numberOfOptions, currentSelection);
+        }
         const int8_t previousSelection = currentSelection;
         ch = _getch();
         if (ch == 0 || ch == 224) ch = _getch();
         switch (ch) {
-            case KEY_W:
-            case KEY_UP:
-                currentSelection = max(0, currentSelection - 1);
-                break;
-            case KEY_S:
-            case KEY_DOWN:
-                currentSelection = min(numberOfOptions - 1, currentSelection + 1);
-                break;
-            default:
-                // Do nothing if the selection did not change.
-                continue;
+            case KEY_W: case KEY_UP:   currentSelection = max(0, currentSelection - 1);                   break;
+            case KEY_S: case KEY_DOWN: currentSelection = min(numberOfOptions - 1, currentSelection + 1); break;
+            default: continue;
         }
         clearLine((uint16_t)(consoleMidRow + menuOptions[previousSelection].rowOffset));
-        setForegroundColor(RED);
+        setForegroundColor(menuOptions[previousSelection].disabled ? DARK_GRAY : RED);
         printCenteredText(menuOptions[previousSelection].text);
         clearLine((uint16_t)(consoleMidRow + menuOptions[currentSelection].rowOffset));
-        setForegroundColor(WHITE);
+        setForegroundColor(menuOptions[currentSelection].disabled ? DARK_GRAY : WHITE);
         setCursorHorizontalPosition((uint16_t)(consoleWidth - (strlen(menuOptions[currentSelection].text) + 4)) / 2);
         printf("< %s >", menuOptions[currentSelection].text);
-    } while (ch != KEY_ENTER && ch != KEY_SPACE);
+    } while ((ch != KEY_ENTER && ch != KEY_SPACE) || menuOptions[currentSelection].disabled);
     return currentSelection;
 }
 
 void openGameSetup(void) {
     const int8_t selection = makeMenu((MenuOption[]){
-        {"Single Player (vs CPU)", -2},
-        {"Multiplayer (2 Players)", 0},
-        {"Back", 3}
-    }, 3, 0);
+        {"Single Player (vs CPU)", true, -2},
+        {"Multiplayer (2 Players)", false, 0},
+        {"Back", false, 3}
+    }, 3, 1);
     switch (selection) {
-        case 0:
-            openGameSetupSinglePlayer();
-            break;
-        case 1:
-            openGameSetupMultiPlayer();
-            break;
-        case 2:
-            openMainMenu(0);
-            break;
-        default:
-            // It should be impossible to get here. Exit with code error 2.
-            exit(2);
+        case 0: openGameSetupSinglePlayer();  break;
+        case 1: openGameSetupMultiPlayer();   break;
+        case 2: openMainMenu(0); break;
+        default: exit(2); // It should be impossible to get here. Exit with code error 2.
     }
 }
 
@@ -310,32 +269,22 @@ void openSettingsMenu(void) {
 
 void openMainMenu(void) {
     const int8_t selection = makeMenu((MenuOption[]){
-        {"Start Game", -3},
-        {"Load  Game", -1},
-        {"Settings", 1},
-        {"Exit", 3}
+        {"Start Game", false, -3},
+        {"Load  Game", false, -1},
+        {"Settings", true, 1},
+        {"Exit", false, 3}
     }, 4, 0);
     switch (selection) {
-        case 0:
-            openGameSetup();
-            break;
-        case 1:
-            openLoadGameMenu();
-            break;
-        case 2:
-            openSettingsMenu();
-            break;
-        case 3:
-            exit(0);
-        default:
-            // It should be impossible to get here. Exit with code error 2.
-            exit(2);
+        case 0: openGameSetup();    break;
+        case 1: openLoadGameMenu(); break;
+        case 2: openSettingsMenu(); break;
+        case 3: exit(0);
+        default: exit(2); // It should be impossible to get here. Exit with code error 2.
     }
 }
 
 int main(void) {
     // TODO: Use atexit() to add a function that runs at the exit of the program to automatically save the game.
-
     if (!setupConsole("The Battle for Middle-Earth")) {
         hideCursor();
         // If we get here we must have failed to resize the console window. We'll ask the user to resize it.
@@ -350,8 +299,10 @@ int main(void) {
                 consoleWidth = getConsoleWidth();
                 consoleHeight = getConsoleHeight();
                 if (consoleWidth >= 135 && consoleHeight >= 45) break;
-                Sleep(1000);
+                Sleep(500);
             }
+            // We flush the input buffer here merely on the off-chance the user presses a key during this prompt.
+            FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
         }
     } else hideCursor();
     while (true) {

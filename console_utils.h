@@ -6,8 +6,8 @@ bool setupConsole(const char* windowTitle);
 
 void setConsoleWindowTitle(const char* str);
 
-void setForegroundColor(const uint32_t color);
-void setBackgroundColor(const uint32_t color);
+void setForegroundColor(uint32_t color);
+void setBackgroundColor(uint32_t color);
 
 static inline void clearConsole(void) {
     printf("\x1B[H\x1B[2J\x1B[3J");

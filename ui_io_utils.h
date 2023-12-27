@@ -30,6 +30,7 @@ typedef enum {
 
 typedef struct {
     const char* text;
+    const bool disabled;
     const int16_t rowOffset;
 } MenuOption;
 
@@ -48,7 +49,7 @@ typedef struct {
  * @param darkenFactor The factor by which to darken the color (0.0 to 1.0).
  * @return The darkened color.
  */
-uint32_t darkenColor(const uint32_t color, float darkenFactor);
+uint32_t darkenColor(uint32_t color, float darkenFactor);
 
 /**
  * Prints a given string centered on the console.
@@ -70,7 +71,7 @@ void drawFullWidthBoxTitle(const char* title);
  * @param width The width of the box.
  * @param height The height of the box.
  */
-void drawRoundedBox(const uint16_t width, const uint16_t height);
+void drawRoundedBox(uint16_t width, uint16_t height);
 
 /**
  * Prints a box with thicker lines at the current position with the given width and height.
@@ -78,7 +79,7 @@ void drawRoundedBox(const uint16_t width, const uint16_t height);
  * @param width The width of the box.
  * @param height The height of the box.
  */
-void drawBoldBox(const uint16_t width, const uint16_t height);
+void drawBoldBox(uint16_t width, uint16_t height);
 
 /**
  * Prints a box at the current position with the given width and height.
@@ -86,7 +87,7 @@ void drawBoldBox(const uint16_t width, const uint16_t height);
  * @param width The width of the box.
  * @param height The height of the box.
  */
-void drawBox(const uint16_t width, const uint16_t height);
+void drawBox(uint16_t width, uint16_t height);
 
 /**
  * Prints a box at the current position with the given title, footer, width, and height.
@@ -100,9 +101,9 @@ void drawBox(const uint16_t width, const uint16_t height);
 void drawBoxWithTitleAndFooter(
     const char* title,
     const char* footer,
-    const uint16_t width,
-    const uint16_t height,
-    void (*boxDrawingFunc)(const uint16_t, const uint16_t)
+    uint16_t width,
+    uint16_t height,
+    void (*boxDrawingFunc)(uint16_t, uint16_t)
 );
 
 /**
@@ -121,7 +122,7 @@ void drawBoxWithTitleAndFooter(
  * @param allowEmpty Flag indicating whether to allow empty lines.
  * @return Pointer to the buffer where the line read is stored.
  */
-char* readLine(char* str, const size_t maxSize, const bool allowEmpty);
+char* readLine(char* str, size_t maxSize, bool allowEmpty);
 
 /**
  * Reads a line from a file and returns it as a string (char*).

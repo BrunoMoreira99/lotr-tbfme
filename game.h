@@ -20,8 +20,8 @@ typedef enum {
 
 typedef enum {
     // Player Colors
-    C_GONDOR = 0x213B79,
-    C_MORDOR = 0xE74856,
+    C_GONDOR = 0x0057E9,
+    C_MORDOR = 0xE11845,
     // Terrain Colors
     C_PLAIN = 0x84FF70,
     C_FOREST = 0x288440,
@@ -123,5 +123,5 @@ extern GameSettings *GameSettings_Current;
 
 GameSettings* getGameSettings(void);
 
-void startNewSinglePlayerGame(char* mapFile, const char* playerName, const bool player1IsMordor);
-void startNewMultiplayerGame(char* mapFile, const char* player1Name, const char* player2Name, const bool player1IsMordor);
+void startNewSinglePlayerGame(char* mapFile, const char* playerName, bool player1IsMordor);
+void startNewMultiplayerGame(char* mapFile, const char* player1Name, const char* player2Name, bool player1IsMordor);
