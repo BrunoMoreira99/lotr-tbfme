@@ -3,8 +3,12 @@
 
 #include "math_utils.h"
 
+int compareInt16Vector2(const Int16Vector2* a, const Int16Vector2* b) {
+    return (a->y != b->y) ? (a->y - b->y) : (a->x - b->x);
+}
+
 int getNumDigits(const int n) {
-    return (int)(log10(abs(n))) + 1;
+    return (n ? (int)(log10(abs(n))) : 0) + 1;
 }
 
 /*  Based on http://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html

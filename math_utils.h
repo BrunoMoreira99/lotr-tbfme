@@ -8,6 +8,15 @@ typedef struct {
 } Int16Vector2;
 
 /**
+ * Compares two Int16Vector2 vectors.
+ *
+ * @param a Pointer to the first Int16Vector2.
+ * @param b Pointer to the second Int16Vector2.
+ * @return The difference between the 'y' components, or, if they are equal, the difference between the 'x' components.
+ */
+int compareInt16Vector2(const Int16Vector2* a, const Int16Vector2* b);
+
+/**
  * Returns the number of digits in an integer.
  * @param n The input integer.
  * @return The number of digits in the input integer.
