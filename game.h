@@ -51,6 +51,7 @@ typedef struct {
     char name[20];
     int32_t coins;
     bool isMordor;
+    bool isAlive;
     bool isCPU;
 } Player;
 
@@ -59,24 +60,20 @@ typedef struct {
     EntityType entityType;
     uint8_t owner;
     int16_t health;
+    bool hasAttackedThisRound;
 } GameBoardCell;
 
 typedef struct {
-    uint64_t timestamp;
+    uint64_t creationTimestamp;
+    uint64_t lastSaveTimestamp;
+    uint64_t elapsedTimeSeconds;
     uint32_t currentRound;
-    Player players[2];
     uint8_t currentPlayerTurn;
     bool isGameOver;
     GameBoardCell board[17][26];
+    uint8_t nPlayers; // This is here for future-proofing. Needed to support games with more than 2 players.
+    Player players[];
 } GameData;
-
-typedef struct {
-    GameData gameData;
-    Player* currentPlayer;
-    Int16Vector2 currentPlayerBaseCoord;
-    List currentPlayerBuildingsList;
-    List currentPlayerUnitsList;
-} GameDataExtended;
 
 typedef struct {
     EntityType entityType;
@@ -116,12 +113,26 @@ typedef struct {
     uint16_t INFANTRY_ATTACK_POWER;
     uint16_t CAVALRY_ATTACK_POWER;
     uint16_t ARTILLERY_ATTACK_POWER;
+    // Other Settings
+    bool ENTITIES_MAY_ONLY_ATTACK_ONCE_PER_ROUND;
 } GameSettings;
+
+typedef struct {
+    GameData* gameData;
+    Player* currentPlayer;
+    Int16Vector2 currentPlayerBaseCoord;
+    List currentPlayerBuildingsList;
+    List currentPlayerUnitsList;
+    GameSettings* gameSettings;
+} GameDataExtended;
 
 extern const GameSettings GameSettings_Default;
 extern GameSettings *GameSettings_Current;
 
 GameSettings* getGameSettings(void);
 
-void startNewSinglePlayerGame(char* mapFile, const char* playerName, bool player1IsMordor);
-void startNewMultiplayerGame(char* mapFile, const char* player1Name, const char* player2Name, bool player1IsMordor);
+bool loadGame(GameData** gameData, uint8_t saveSlot);
+
+void startNewSinglePlayerGame(uint8_t saveSlot, char* mapFile, const char* playerName, bool player1IsMordor);
+void startNewMultiplayerGame(uint8_t saveSlot, char* mapFile, const char* player1Name, const char* player2Name, bool player1IsMordor);
+void resumeSaveGame(uint8_t saveSlot);

@@ -1,20 +1,50 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <windows.h>
 
 #include "console_utils.h"
 #include "ui_io_utils.h"
 
-uint32_t darkenColor(const uint32_t color, float darkenFactor) {
-    darkenFactor = 1.0f - darkenFactor;
+bool enforceConsoleResize(const char* textA, const char* textB, const uint16_t minWidth, const uint16_t minHeight) {
+    if (textA == NULL) textA = "Window size below minimum requirements!";
+    if (textB == NULL) textB = "Increase the window size to proceed.";
+    uint32_t currentConsoleDimensions = getConsoleDimensions();
+    uint16_t consoleWidth = currentConsoleDimensions & 0xFFFF;
+    uint16_t consoleHeight = currentConsoleDimensions >> 16 & 0xFFFF;
+    if (consoleWidth >= minWidth && consoleHeight >= minHeight) return false;
+    uint32_t previousConsoleDimensions = 0;
+    clearConsole();
+    while (consoleWidth < minWidth || consoleHeight < minHeight) {
+        if (currentConsoleDimensions != previousConsoleDimensions) {
+            setCursorVerticalPosition(consoleHeight / 2 - 1);
+            printf("\x1B[%dG%s\n", (uint16_t)(consoleWidth - strlen(textA)) / 2, textA);
+            printf("\x1B[%dG%s", (uint16_t)(consoleWidth - strlen(textB)) / 2, textB);
+            previousConsoleDimensions = currentConsoleDimensions;
+        }
+        currentConsoleDimensions = getConsoleDimensions();
+        Sleep(17);
+        if (currentConsoleDimensions != previousConsoleDimensions) {
+            consoleWidth = currentConsoleDimensions & 0xFFFF;
+            consoleHeight = currentConsoleDimensions >> 16 & 0xFFFF;
+            if (consoleWidth >= minWidth && consoleHeight >= minHeight) break;
+            clearConsole();
+        }
+    }
+    // We flush the input buffer here merely on the off-chance the user presses a key during this prompt.
+    FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
+    clearConsole();
+    return true;
+}
 
+uint32_t modifyColorBrightness(const uint32_t color, const float brightnessModifier) {
     uint8_t red = (color >> 16) & 0xFF;
     uint8_t green = (color >> 8) & 0xFF;
     uint8_t blue = color & 0xFF;
 
-    red = (uint8_t)((float)red * darkenFactor);
-    green = (uint8_t)((float)green * darkenFactor);
-    blue = (uint8_t)((float)blue * darkenFactor);
+    red = (uint8_t)max(min((red * brightnessModifier), UINT8_MAX), 0);
+    green = (uint8_t)max(min((green * brightnessModifier), UINT8_MAX), 0);
+    blue = (uint8_t)max(min((blue * brightnessModifier), UINT8_MAX), 0);
 
     return (red << 16) | (green << 8) | blue;
 }

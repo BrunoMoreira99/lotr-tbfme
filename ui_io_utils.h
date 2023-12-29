@@ -42,14 +42,27 @@ typedef struct {
     const uint16_t consoleColumn;
 } ActionMenuOption;
 
+/** Prompts the user to resize the console window to a supported dimension.
+ * 
+ * @param textA A string containing the first line of the prompt message.
+ *              If NULL, the default message "Window size below minimum requirements!" will be used.
+ * @param textB A string containing the second line of the prompt message.
+ *              If NULL, the default message "Increase the window size to proceed." will be used.
+ * @param minWidth The minimum width of the console window.
+ * @param minHeight The minimum height of the console window.
+ * @return True if the console was resized and graphics should be redrawn, False if no action is needed.
+ */
+bool enforceConsoleResize(const char* textA, const char* textB, uint16_t minWidth, uint16_t minHeight);
+
 /**
- * Darkens a given color by a specified factor.
+ * Modifies the brightness of a given color by the specified amount.
  * 
  * @param color The original color in 24-bit RGB format.
- * @param darkenFactor The factor by which to darken the color (0.0 to 1.0).
- * @return The darkened color.
+ * @param brightnessModifier The brightness modifier, a value lesser than 1.0 will darken the color,
+ *                           a value greater than 1.0 will brighten the color.
+ * @return The modified color.
  */
-uint32_t darkenColor(uint32_t color, float darkenFactor);
+uint32_t modifyColorBrightness(uint32_t color, float brightnessModifier);
 
 /**
  * Prints a given string centered on the console.

@@ -2,11 +2,12 @@
 
 #include "linked_list.h"
 
-List List_init(void) {
+List List_init(int (*compareFunction)(const void*, const void*)) {
     List new_list;
     new_list.length = 0;
     new_list.head = NULL;
     new_list.tail = NULL;
+    new_list.compare = compareFunction;
     return new_list;
 }
 
@@ -28,9 +29,7 @@ void List_append(List* list, void* data) {
 
 void* List_pop(List* list, const size_t index) {
     if (list == NULL) return list;
-    if (index >= list->length) {
-        return NULL;
-    }
+    if (index >= list->length) return NULL;
     Node* node_to_remove;
     if (index < list->length / 2) {
         node_to_remove = list->head;
@@ -55,10 +54,37 @@ void* List_pop(List* list, const size_t index) {
     if (list->tail == node_to_remove) {
         list->tail = node_to_remove->previous;
     }
-    void *remove_data = node_to_remove->data;
+    void *removed_data = node_to_remove->data;
     free(node_to_remove);
     --list->length;
-    return remove_data;
+    return removed_data;
+}
+
+void* List_remove(List* list, const void* data_to_remove) {
+    if (list == NULL || data_to_remove == NULL) return NULL; 
+    Node* current_node = list->head;
+    while (current_node != NULL) {
+        if (list->compare(current_node->data, data_to_remove) == 0) {
+            if (current_node == list->head) {
+                list->head = list->head->next;
+            }
+            if (current_node->previous != NULL) {
+                current_node->previous->next = current_node->next;
+            }
+            if (current_node->next != NULL) {
+                current_node->next->previous = current_node->previous;
+            }
+            if (current_node == list->tail) {
+                list->tail = list->tail->previous;
+            }
+            void* removed_data = current_node->data;
+            free(current_node);
+            --list->length;
+            return removed_data;
+        }
+        current_node = current_node->next;
+    }
+    return NULL;
 }
 
 void List_clear(List* list) {
@@ -66,7 +92,7 @@ void List_clear(List* list) {
     Node *current_node = list->head;
     while (current_node != NULL) {
         Node *next_node = current_node->next;
-        free(current_node->data); // This will crash if the data is not in the heap.
+        free(current_node->data); // Dangerous: This assumes the data is in the heap. It will crash if it is not.
         free(current_node);
         current_node = next_node;
     }

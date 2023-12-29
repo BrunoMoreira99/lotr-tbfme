@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
+#include <time.h>
 #include <conio.h>
 #include <windows.h>
 
@@ -10,7 +10,37 @@
 #include "ui_io_utils.h"
 #include "game.h"
 
-int8_t openMainMenu(int8_t currentSelection);
+typedef struct {
+    uint8_t day;
+    uint8_t month;
+    uint16_t year;
+} Date;
+
+Date getDate(const uint64_t timestamp) {
+    const time_t t = (time_t)timestamp;
+    const struct tm *tm = localtime(&t);
+    return (Date){(uint8_t)tm->tm_mday, (uint8_t)(tm->tm_mon + 1), (uint16_t)(tm->tm_year + 1900)};
+}
+
+void printFormattedTime(const uint64_t totalSeconds) {
+    const uint64_t hours = totalSeconds / 3600;
+    const uint64_t remainingSeconds = totalSeconds % 3600;
+    const uint64_t minutes = remainingSeconds / 60;
+    const uint64_t seconds = remainingSeconds % 60;
+
+    if (hours > 0) {
+        if (minutes == 1) printf("1 hour, ");
+        else printf("%llu hours, ", hours);
+    }
+    if (hours > 0 || minutes > 0) {
+        if (minutes == 1) printf("1 minute, ");
+        else printf("%llu minutes, ", minutes);
+    }
+    if (seconds == 1) printf("1 second");
+    else printf("%llu seconds", seconds);
+}
+
+int16_t openMainMenu(int16_t currentSelection);
 
 inline void printTitle(void) {
     const char* asciiArt[] = {
@@ -23,9 +53,9 @@ inline void printTitle(void) {
         " //  //__//___/__/   //               \\\\   \\    \\\\    \\\\ ",
         "//___________/______//                 \\\\___\\____\\\\____\\\\"
     };
-    const uint32_t centerPoint = (getConsoleWidth() - 58) / 2;
-    for (uint32_t i = 0; i < 8; i++) {
-        for (uint32_t j = 0; j < centerPoint; j++) {
+    const uint16_t centerPoint = (getConsoleWidth() - 58) / 2;
+    for (uint16_t i = 0; i < 8; ++i) {
+        for (uint16_t j = 0; j < centerPoint; ++j) {
             putchar(' ');
         }
         puts(asciiArt[i]);
@@ -34,14 +64,14 @@ inline void printTitle(void) {
     printCenteredText("THE BATTLE FOR MIDDLE-EARTH");
 }
 
-int loadMapList(char*** mapList) {
+uint32_t loadMapList(char*** mapList) {
     FILE *fp = fopen("Maps\\MapList.data", "r");
     if (fp == NULL) return 0;
     char *firstLine = fReadLine(fp);
-    int mapCount = strtol(firstLine, NULL, 10);
+    uint32_t mapCount = strtol(firstLine, NULL, 10);
     free(firstLine);
     *mapList = malloc(mapCount * sizeof(char*));
-    for (int i = 0; i < mapCount; i++) {
+    for (uint32_t i = 0; i < mapCount; ++i) {
         char *mapName = fReadLine(fp);
         char* mapFileName = malloc(10 + strlen(mapName));
         (void)sprintf(mapFileName, "Maps\\%s.map", mapName);
@@ -98,16 +128,17 @@ void drawMapPreview(const char* mapName, const uint16_t row, const uint16_t colu
 
 char* openMapSelector(void) {
     char **mapList;
-    const int mapCount = loadMapList(&mapList);
+    const uint32_t mapCount = loadMapList(&mapList);
     if (!mapCount) return NULL;
     int currentSelection = 0;
     if (mapCount > 1) {
-        const uint16_t consoleWidth = getConsoleWidth();
-        const uint16_t consoleHeight = getConsoleHeight();
+        const uint32_t currentConsoleDimensions = getConsoleDimensions();
+        const uint16_t consoleWidth = currentConsoleDimensions & 0xFFFF;
+        const uint16_t consoleHeight = currentConsoleDimensions >> 16 & 0xFFFF;
         clearConsole();
         setForegroundColor(RED);
         drawFullWidthBoxTitle("Map Selector");
-        for (uint16_t i = 5; i <= consoleHeight ; i++) {
+        for (uint16_t i = 5; i <= consoleHeight; ++i) {
             setCursorVerticalHorizontalPosition(i, 2);
             printf("┃");
         }
@@ -120,12 +151,15 @@ char* openMapSelector(void) {
         setCursorVerticalHorizontalPosition(5, 4);
         printf("> %s", mapList[0]);
         setForegroundColor(RED);
-        for (int i = 1; i < mapCount; i++) {
+        for (uint32_t i = 1; i < mapCount; ++i) {
             setCursorVerticalHorizontalPosition(5 + (uint16_t)i * 2, 4);
             printf("  %s", mapList[i]);
         }
         int ch;
         do {
+            if (currentConsoleDimensions != getConsoleDimensions()) {
+                return openMapSelector();
+            }
             const int previousSelection = currentSelection;
             ch = _getch();
             if (ch == 0 || ch == 224) ch = _getch();
@@ -135,7 +169,7 @@ char* openMapSelector(void) {
                 case KEY_ENTER: case KEY_SPACE: break;
                 default: continue;
             }
-            currentSelection = (currentSelection + mapCount) % mapCount;
+            currentSelection = (int32_t)((currentSelection + mapCount) % mapCount);
             setCursorVerticalHorizontalPosition(5 + (uint16_t)previousSelection * 2, 4);
             setForegroundColor(RED);
             printf("  %s", mapList[previousSelection]);
@@ -148,19 +182,19 @@ char* openMapSelector(void) {
     }
     char* chosenMapFile = malloc(10 + strlen(mapList[currentSelection]));
     (void)sprintf(chosenMapFile, "Maps\\%s.map", mapList[currentSelection]);
-    for (int i = 0; i < mapCount; i++) {
+    for (uint32_t i = 0; i < mapCount; ++i) {
         free(mapList[i]);
     }
     free(mapList);
     return chosenMapFile;
 }
 
-void openGameSetupSinglePlayer(void) {
+void openGameSetupSinglePlayer(const uint8_t selectedSaveSlot) {
     const uint16_t consoleHeight = getConsoleHeight();
     clearConsole();
     setForegroundColor(RED);
     drawFullWidthBoxTitle("Player Setup");
-    for (uint16_t i = 5; i <= consoleHeight ; i++) {
+    for (uint16_t i = 5; i <= consoleHeight; ++i) {
         setCursorVerticalHorizontalPosition(i, 2);
         printf("┃");
     }
@@ -171,17 +205,16 @@ void openGameSetupSinglePlayer(void) {
     setForegroundColor(WHITE);
     readLine(playerName, 20, false);
     hideCursor();
-    const char* chosenMapFile = openMapSelector();
-    clearConsole();
-    startNewSinglePlayerGame(chosenMapFile, playerName, false);    
+    char* chosenMapFile = openMapSelector();
+    startNewSinglePlayerGame(selectedSaveSlot, chosenMapFile, playerName, false);    
 }
 
-void openGameSetupMultiPlayer(void) {
+void openGameSetupMultiPlayer(const uint8_t selectedSaveSlot) {
     const uint16_t consoleHeight = getConsoleHeight();
     clearConsole();
     setForegroundColor(RED);
     drawFullWidthBoxTitle("Player Setup");
-    for (uint16_t i = 5; i <= consoleHeight ; i++) {
+    for (uint16_t i = 5; i <= consoleHeight ; ++i) {
         setCursorVerticalHorizontalPosition(i, 2);
         printf("┃");
     }
@@ -197,20 +230,20 @@ void openGameSetupMultiPlayer(void) {
     setForegroundColor(WHITE);
     readLine(player2Name, 20, false);
     hideCursor();
-    const char* chosenMapFile = openMapSelector();
-    clearConsole();
-    startNewMultiplayerGame(chosenMapFile, player1Name, player2Name, false);    
+    char* chosenMapFile = openMapSelector();
+    startNewMultiplayerGame(selectedSaveSlot, chosenMapFile, player1Name, player2Name, false);    
 }
 
-int8_t makeMenu(const MenuOption* menuOptions, const int8_t numberOfOptions, int8_t currentSelection) {
+int16_t makeMenu(const MenuOption* menuOptions, const int8_t numberOfOptions, int16_t currentSelection) {
     const uint32_t currentConsoleDimensions = getConsoleDimensions();
     const uint16_t consoleWidth = currentConsoleDimensions & 0xFFFF;
     const uint16_t consoleMidRow = (currentConsoleDimensions >> 16 & 0xFFFF) / 2;
     resetTextDecoration();
     clearConsole();
     setForegroundColor(RED);
+    setCursorVerticalPosition(4);
     printTitle();
-    for (int i = 0; i < numberOfOptions; i++) {
+    for (int8_t i = 0; i < numberOfOptions; ++i) {
         setCursorVerticalPosition((uint16_t)(consoleMidRow + menuOptions[i].rowOffset));
         if (currentSelection == i) {
             setForegroundColor(menuOptions[i].disabled ? DARK_GRAY : WHITE);
@@ -226,7 +259,7 @@ int8_t makeMenu(const MenuOption* menuOptions, const int8_t numberOfOptions, int
         if (currentConsoleDimensions != getConsoleDimensions()) {
             return makeMenu(menuOptions, numberOfOptions, currentSelection);
         }
-        const int8_t previousSelection = currentSelection;
+        const int32_t previousSelection = currentSelection;
         ch = _getch();
         if (ch == 0 || ch == 224) ch = _getch();
         switch (ch) {
@@ -245,67 +278,200 @@ int8_t makeMenu(const MenuOption* menuOptions, const int8_t numberOfOptions, int
     return currentSelection;
 }
 
+void drawSaveSlotBlock_NewGame(const uint8_t slotId, const bool selected, const uint16_t row, const uint16_t column) {
+    GameData *gameData = NULL;
+    setForegroundColor(selected ? WHITE : RED);
+    setCursorVerticalHorizontalPosition(row, column);
+    drawBoldBox(50, 5);
+    setCursorVerticalHorizontalPosition(row, column + 2);
+    printf(" Save Slot %d ", slotId);
+    if (loadGame(&gameData, slotId)) {
+        setCursorVerticalHorizontalPosition(row + 2, column + 3);
+        printf("%s vs. %s", gameData->players[0].name, gameData->players[1].name);
+        const Date lastSaveDate = getDate(gameData->lastSaveTimestamp);
+        setCursorVerticalHorizontalPosition(row, column + 36);
+        printf(" %d/%d/%d ", lastSaveDate.day, lastSaveDate.month, lastSaveDate.year);
+        setCursorVerticalHorizontalPosition(row + 3, column + 3);
+        setForegroundColor(selected ? RED : DARK_GRAY);
+        printf("Overwrite Save Game");
+        free(gameData);
+    } else {
+        setCursorVerticalHorizontalPosition(row + 2, column + 3);
+        printf("New Game");
+    }
+    setForegroundColor(RED);
+}
+
+bool drawSaveSlotBlock_LoadGame(const uint8_t slotId, const bool selected, const uint16_t row, const uint16_t column) {
+    GameData *gameData = NULL;
+    const bool loadedSuccessfully = loadGame(&gameData, slotId);
+    setForegroundColor(loadedSuccessfully ? (selected ? WHITE : RED) : DARK_GRAY);
+    setCursorVerticalHorizontalPosition(row, column);
+    drawBoldBox(50, 5);
+    setCursorVerticalHorizontalPosition(row, column + 2);
+    printf(" Save Slot %d ", slotId);
+    if (loadedSuccessfully) {
+        setCursorVerticalHorizontalPosition(row + 2, column + 3);
+        printf("%s vs. %s", gameData->players[0].name, gameData->players[1].name);
+        const Date lastSaveDate = getDate(gameData->lastSaveTimestamp);
+        setCursorVerticalHorizontalPosition(row, column + 36);
+        printf(" %d/%d/%d ", lastSaveDate.day, lastSaveDate.month, lastSaveDate.year);
+        setCursorVerticalHorizontalPosition(row + 3, column + 3);
+        printf("Game Time: ");
+        printFormattedTime(gameData->elapsedTimeSeconds);
+        free(gameData);
+    } else {
+        setCursorVerticalHorizontalPosition(row + 2, column + 3);
+        printf("Empty Slot");
+    }
+    setForegroundColor(RED);
+    return loadedSuccessfully;
+}
+
+int32_t openGameSetupSaveSlotSelection(int8_t currentSelection) {
+    const uint32_t currentConsoleDimensions = getConsoleDimensions();
+    const uint16_t consoleWidth = currentConsoleDimensions & 0xFFFF;
+    const uint16_t consoleHeight = currentConsoleDimensions >> 16 & 0xFFFF;
+    const uint8_t blockHeight = 6, nSaveSlots = 6;
+    const uint16_t startColumn = (consoleWidth - 50) / 2;
+    const uint16_t startRow = (consoleHeight - (blockHeight * nSaveSlots - 1)) / 2 + (consoleHeight % 2 == 0 ? 2 : 1);
+    clearConsole();
+    setForegroundColor(RED);
+    drawFullWidthBoxTitle("Select Save Slot");
+    for (int8_t i = 0; i < nSaveSlots; ++i) {
+        drawSaveSlotBlock_NewGame(i + 1, i == currentSelection, (uint16_t)(startRow + i * blockHeight), startColumn);
+    }
+    int ch;
+    do {
+        if (currentConsoleDimensions != getConsoleDimensions()) {
+            return openGameSetupSaveSlotSelection(currentSelection);
+        }
+        const int8_t previousSelection = currentSelection;
+        ch = _getch();
+        if (ch == 0 || ch == 224) ch = _getch();
+        if (ch == KEY_ESC) return MENU_BACK;
+        switch (ch) {
+            case KEY_W: case KEY_UP:   currentSelection = max(0, currentSelection - 1); break;
+            case KEY_S: case KEY_DOWN: currentSelection = min(5, currentSelection + 1); break;
+            default: continue;
+        }
+        drawSaveSlotBlock_NewGame(previousSelection + 1, false, (uint16_t)(startRow + previousSelection * blockHeight), startColumn);
+        drawSaveSlotBlock_NewGame(currentSelection + 1, true, (uint16_t)(startRow + currentSelection * blockHeight), startColumn);
+    } while (ch != KEY_ENTER && ch != KEY_SPACE);
+    return currentSelection;
+}
+
 void openGameSetup(void) {
-    const int8_t selection = makeMenu((MenuOption[]){
+    const int16_t selection = makeMenu((MenuOption[]){
         {"Single Player (vs CPU)", true, -2},
         {"Multiplayer (2 Players)", false, 0},
         {"Back", false, 3}
     }, 3, 1);
-    switch (selection) {
-        case 0: openGameSetupSinglePlayer();  break;
-        case 1: openGameSetupMultiPlayer();   break;
-        case 2: openMainMenu(0); break;
-        default: exit(2); // It should be impossible to get here. Exit with code error 2.
+    if (selection == 2) openMainMenu(0);
+    else {
+        const int32_t saveSlotSelectionResult = openGameSetupSaveSlotSelection(0);
+        if (saveSlotSelectionResult == MENU_BACK) {
+            openGameSetup();
+            return;
+        }
+        const uint8_t selectedSaveSlot = (uint8_t)(saveSlotSelectionResult + 1);
+        switch (selection) {
+            case 0: openGameSetupSinglePlayer(selectedSaveSlot); break;
+            case 1: openGameSetupMultiPlayer(selectedSaveSlot);  break;
+            default: exit(2); // It should be impossible to get here.
+        }
     }
 }
 
-void openLoadGameMenu(void) {
-    // TODO: Implement Load Game Menu.
+bool hasAnySavedGame(void) {
+    for (uint8_t i = 1; i <= 6; ++i) {
+        GameData *gameData = NULL;
+        if (loadGame(&gameData, i)) {
+            free(gameData);
+            return true;
+        }
+    }
+    return false;
+}
+
+void openLoadGameMenu(int8_t currentSelection) {
+    const uint32_t currentConsoleDimensions = getConsoleDimensions();
+    const uint16_t consoleWidth = currentConsoleDimensions & 0xFFFF;
+    const uint16_t consoleHeight = currentConsoleDimensions >> 16 & 0xFFFF;
+    const uint8_t blockHeight = 6, nSaveSlots = 6;
+    const uint16_t startColumn = (consoleWidth - 50) / 2;
+    const uint16_t startRow = (consoleHeight - (blockHeight * nSaveSlots - 1)) / 2 + (consoleHeight % 2 == 0 ? 2 : 1);
+    clearConsole();
+    setForegroundColor(RED);
+    drawFullWidthBoxTitle("Load Game");
+    bool saveSlotStates[6];
+    for (int8_t i = 0; i < nSaveSlots; ++i) {
+        saveSlotStates[i] = drawSaveSlotBlock_LoadGame(i + 1, i == currentSelection, (uint16_t)(startRow + i * blockHeight), startColumn);
+    }
+    int ch;
+    do {
+        if (currentConsoleDimensions != getConsoleDimensions()) {
+            openLoadGameMenu(currentSelection);
+            return;
+        }
+        const int8_t previousSelection = currentSelection;
+        ch = _getch();
+        if (ch == 0 || ch == 224) ch = _getch();
+        if (ch == KEY_ESC) return;
+        switch (ch) {
+            case KEY_W: case KEY_UP:
+                do {
+                    currentSelection = (int8_t)((currentSelection - 1 + nSaveSlots) % nSaveSlots);
+                } while (!saveSlotStates[currentSelection]);
+                break;
+            case KEY_S: case KEY_DOWN:
+                do {
+                    currentSelection = (int8_t)((currentSelection + 1) % nSaveSlots);
+                } while (!saveSlotStates[currentSelection]);
+                break;
+            default: continue;
+        }
+        if (currentSelection == previousSelection) continue;
+        drawSaveSlotBlock_LoadGame(previousSelection + 1, false, (uint16_t)(startRow + previousSelection * blockHeight), startColumn);
+        drawSaveSlotBlock_LoadGame(currentSelection + 1, true, (uint16_t)(startRow + currentSelection * blockHeight), startColumn);
+    } while (ch != KEY_ENTER && ch != KEY_SPACE);
+    resumeSaveGame(currentSelection + 1);
 }
 
 void openSettingsMenu(void) {
     // TODO: Implement Settings Menu.
 }
 
-void openMainMenu(void) {
-    const int8_t selection = makeMenu((MenuOption[]){
+int16_t openMainMenu(const int16_t currentSelection) {
+    const int16_t selection = makeMenu((MenuOption[]){
         {"Start Game", false, -3},
-        {"Load  Game", false, -1},
+        {"Load  Game", !hasAnySavedGame(), -1},
         {"Settings", true, 1},
         {"Exit", false, 3}
-    }, 4, 0);
+    }, 4, currentSelection);
     switch (selection) {
-        case 0: openGameSetup();    break;
-        case 1: openLoadGameMenu(); break;
+        case 0: openGameSetup(); break;
+        case 1: openLoadGameMenu(0); break;
         case 2: openSettingsMenu(); break;
         case 3: exit(0);
-        default: exit(2); // It should be impossible to get here. Exit with code error 2.
+        default: exit(2); // It should be impossible to get here.
     }
+    return selection;
 }
 
 int main(void) {
-    // TODO: Use atexit() to add a function that runs at the exit of the program to automatically save the game.
     if (!setupConsole("The Battle for Middle-Earth")) {
         hideCursor();
         // If we get here we must have failed to resize the console window. We'll ask the user to resize it.
-        uint16_t consoleWidth = getConsoleWidth();
-        uint16_t consoleHeight = getConsoleHeight();
-        if (consoleWidth < 135 || consoleHeight < 45) {
-            setCursorVerticalPosition(consoleHeight / 2 - 1);
-            printCenteredText("Welcome to The Battle for Middle-Earth");
-            printf("\n");
-            printCenteredText("Please increase the window size for a better experience.");
-            while (1) {
-                consoleWidth = getConsoleWidth();
-                consoleHeight = getConsoleHeight();
-                if (consoleWidth >= 135 && consoleHeight >= 45) break;
-                Sleep(500);
-            }
-            // We flush the input buffer here merely on the off-chance the user presses a key during this prompt.
-            FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
-        }
+        enforceConsoleResize(
+            "Welcome to The Battle for Middle-Earth",
+            "Please increase the window size for a better experience.",
+            135,
+            46
+        );
     } else hideCursor();
+    int16_t currentSelection = 0;
     while (true) {
-        openMainMenu(0);
+        currentSelection = openMainMenu(currentSelection);
     }
 }
