@@ -161,7 +161,7 @@ double getVictimTerrainAttackPowerModifier(const TerrainType terrainType) {
     }
 }
 
-char* getTerrainName(const TerrainType terrainType) {
+const char* getTerrainName(const TerrainType terrainType) {
     switch (terrainType) {
         case PLAIN:    return "Plains";
         case FOREST:   return "Forest";
@@ -176,7 +176,7 @@ char* getTerrainName(const TerrainType terrainType) {
     return NULL;
 }
 
-char* getEntityName(const EntityType entityType, const bool ownerIsMordor) {
+const char* getEntityName(const EntityType entityType, const bool ownerIsMordor) {
     switch (entityType) {
         case BASE:      return "Base";
         case MINES:     return "Mines";
@@ -449,7 +449,7 @@ void setCursorAtCellCoord(const Int16Vector2 cellCoord) {
     setCursorVerticalHorizontalPosition(1 + 2 * (cellCoord.y + 1), 4 * (cellCoord.x + 1));
 }
 
-char* getCellStrRepr(const GameData* gameData, const GameBoardCell* cell) {
+const char* getCellStrRepr(const GameData* gameData, const GameBoardCell* cell) {
     switch (cell->entityType) {
         case BASE:       return gameData->players[cell->owner].isMordor ? "MMM" : "GGG";
         case MINES:      return " M ";
@@ -697,7 +697,7 @@ void printEntityList(const GameDataExtended* gameDataEx, const uint8_t mode) {
 }
 
 bool isValidCell(const Int16Vector2 cellCoord, const List validCells) {
-    Node *e = validCells.head;
+    const Node *e = validCells.head;
     while (e) {
         const Int16Vector2 *eData = e->data;
         if (eData->x == cellCoord.x && eData->y == cellCoord.y) return true;
@@ -707,7 +707,7 @@ bool isValidCell(const Int16Vector2 cellCoord, const List validCells) {
 }
 
 void drawValidCells(const GameData* gameData, const List validCells, const bool darken) {
-    Node *e = validCells.head;
+    const Node *e = validCells.head;
     while (e) {
         const Int16Vector2 *eData = e->data;
         setCursorAtCellCoord(*eData);
@@ -1498,6 +1498,19 @@ void createBoardFromMapFile(char* const mapFileName, GameData* gameData) {
     free(mapFileName);
 }
 
+void assignRandomPlayerBases(GameData* gameData) {
+    srand((uint64_t)time(NULL) % UINT32_MAX);
+    for (uint8_t pId = 0; pId < gameData->nPlayers; ++pId) {
+        uint16_t y, x, n = 0;
+        do {
+            y = rand() % 15 + 1;
+            x = gameData->players[pId].isMordor ? 24 - rand() % 2 : rand() % 2 + 1;
+            ++n;
+        } while (gameData->board[y][x].entityType != EMPTY_CELL && n < 100);
+        createEntity(&gameData->board[y][x], &gameData->players[pId], BASE);
+    }
+}
+
 void startNewSinglePlayerGame(const uint8_t saveSlot, char* const mapFile, const char* const playerName, const bool player1IsMordor) {
     GameData gameData = {
         time(NULL),
@@ -1513,7 +1526,8 @@ void startNewSinglePlayerGame(const uint8_t saveSlot, char* const mapFile, const
             {1, "CPU", 100, !player1IsMordor, true, true }
         }
     };
-    createBoardFromMapFile(mapFile, &gameData);
+    if (mapFile != NULL) createBoardFromMapFile(mapFile, &gameData);
+    else assignRandomPlayerBases(&gameData);
     strcpy(gameData.players[0].name, playerName);
     Game(&gameData, saveSlot);
 }
@@ -1533,7 +1547,8 @@ void startNewMultiplayerGame(const uint8_t saveSlot, char* const mapFile, const 
             {1, "Player 2", 100, !player1IsMordor, true, false }
         }
     };
-    createBoardFromMapFile(mapFile, &gameData);
+    if (mapFile != NULL) createBoardFromMapFile(mapFile, &gameData);
+    else assignRandomPlayerBases(&gameData);
     strcpy(gameData.players[0].name, player1Name);
     strcpy(gameData.players[1].name, player2Name);
     Game(&gameData, saveSlot);
