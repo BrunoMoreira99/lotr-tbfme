@@ -1009,20 +1009,20 @@ void drawEntityStatus(const GameData* gameData, const Int16Vector2 cellCoord, co
     setCursorVerticalHorizontalPosition(41, column);
     clearFromCursorForward(30);
     for (uint16_t i = 0; i < remainingHpBarWidth; ++i) {
-        printf("▃");
+        printf("\u2584");
     }
     if (damageBarWidth) {
         setForegroundColor(RED);
         enableBlinking();
         for (uint16_t i = 0; i < damageBarWidth; ++i) {
-            printf("▃");
+            printf("\u2584");
         }
         disableBlinking();
     }
     if (lostHpBarWidth) {
         setForegroundColor(DARK_GRAY);
         for (uint16_t i = 0; i < lostHpBarWidth; ++i) {
-            printf("▃");
+            printf("\u2584");
         }
     }
     if (damage) {
