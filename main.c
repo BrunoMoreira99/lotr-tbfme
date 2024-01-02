@@ -1,4 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
+
+#define _WIN32_WINNT 0x0500
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -463,6 +466,16 @@ int main(void) {
     if (!setupConsole("The Battle for Middle-Earth")) {
         hideCursor();
         // If we get here we must have failed to resize the console window. We'll ask the user to resize it.
+        const HANDLE hConsoleOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hConsoleOut != INVALID_HANDLE_VALUE) {
+            const COORD maxWindowSize = GetLargestConsoleWindowSize(hConsoleOut);
+            if (maxWindowSize.Y < 46 || maxWindowSize.X < 135) {
+                printCenteredText("Your screen size is unsupported.");
+                printCenteredText("Exiting game...");
+                Sleep(5000);
+                exit(0);
+            }
+        }
         enforceConsoleResize(
             "Welcome to The Battle for Middle-Earth",
             "Please increase the window size for a better experience.",
