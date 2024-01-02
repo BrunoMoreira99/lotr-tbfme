@@ -108,7 +108,8 @@ uint32_t getCursorPosition(void) {
 }
 
 uint32_t getConsoleDimensions(void) {
-    /* Implementation using ANSI Escape Sequences. 
+    /* Below is an implementation using ANSI Escape Sequences.
+     * We are also using the WinAPI here instead of Escape Sequences due to performance reasons.
     // This is a little bit of an hack, but good enough.
     const uint32_t currentCursorPosition = getCursorPosition();
     // Move cursor the bottom right corner.
@@ -117,8 +118,6 @@ uint32_t getConsoleDimensions(void) {
     // Move cursor back to its original position.
     setCursorPosition(currentCursorPosition);
     return result;
-    * 
-    * Went back to using the WinAPI due to performance reasons.
     */
     const HANDLE hConsoleOut = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_SCREEN_BUFFER_INFO consoleInfo;

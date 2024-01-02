@@ -35,10 +35,14 @@ GameSettings* getGameSettings(void) {
 }
 
 bool saveGame(GameData* gameData, const uint8_t saveSlot) {
-    const size_t bufSize = snprintf(NULL, 0, "Slot_%02d.savegame", saveSlot) + 1;
+    const int32_t bufSize = snprintf(NULL, 0, "Slot_%02d.savegame", saveSlot) + 1;
     char *filename = malloc(bufSize);
-    (void)snprintf(filename, bufSize, "Slot_%02d.savegame", saveSlot);
+    if (filename == NULL) return false;
+    const int32_t r = snprintf(filename, bufSize, "Slot_%02d.savegame", saveSlot);
+    // Only when the returned value is non-negative and less than n (bufSize), the string has been completely written.
+    if (r < 0 || r >= bufSize) return false;
     FILE* file = fopen(filename, "wb");
+    free(filename);
     if (file == NULL) return false;
     gameData->lastSaveTimestamp = time(NULL);
     // Write the fixed-size part of GameData
@@ -46,15 +50,17 @@ bool saveGame(GameData* gameData, const uint8_t saveSlot) {
     // Write the players data
     (void)fwrite(gameData->players, sizeof(Player), gameData->nPlayers, file);
     (void)fclose(file);
-    free(filename);
     return true;
 }
 
 bool loadGame(GameData** gameData, const uint8_t saveSlot) {
-    const size_t bufSize = snprintf(NULL, 0, "Slot_%02d.savegame", saveSlot) + 1;
+    const int32_t bufSize = snprintf(NULL, 0, "Slot_%02d.savegame", saveSlot) + 1;
     char *filename = malloc(bufSize);
-    (void)snprintf(filename, bufSize, "Slot_%02d.savegame", saveSlot);
+    if (filename == NULL) return false;
+    const int32_t r = snprintf(filename, bufSize, "Slot_%02d.savegame", saveSlot);
+    if (r <= 0 || r >= bufSize) return false;
     FILE* file = fopen(filename, "rb");
+    free(filename);
     if (file == NULL) return false;
     
     // Read the fixed-size part of GameData
@@ -69,7 +75,6 @@ bool loadGame(GameData** gameData, const uint8_t saveSlot) {
     (void)fread((*gameData)->players, sizeof(Player), (*gameData)->nPlayers, file);
     
     (void)fclose(file);
-    free(filename);
     return true;
 }
 
@@ -540,6 +545,18 @@ bool performAttack(GameDataExtended* gameDataEx, const Int16Vector2 attackerCoor
     attackerCell->hasAttackedThisRound = true;
     GameBoardCell *victimCell = &gameDataEx->gameData->board[victimCoord.y][victimCoord.x];
     const uint16_t attackPower = getAttackPower(gameDataEx->gameData, attackerCoord, victimCoord);
+    ActionLog *actionLog = malloc(sizeof(ActionLog));
+    *actionLog = (ActionLog){
+        ATTACK,
+        &gameDataEx->gameData->players[attackerCell->owner],
+        &gameDataEx->gameData->players[victimCell->owner],
+        attackPower,
+        attackerCell->entityType,
+        victimCell->entityType,
+        attackerCoord,
+        victimCoord
+    };
+    Stack_push(&gameDataEx->actionLog, actionLog);
     if (victimCell->health <= attackPower) {
         if (victimCell->entityType == BASE) {
             victimCell->health = 0;
@@ -553,18 +570,6 @@ bool performAttack(GameDataExtended* gameDataEx, const Int16Vector2 attackerCoor
         return true;
     }
     victimCell->health = (int16_t)(victimCell->health - attackPower);
-    ActionLog *actionLog = malloc(sizeof(ActionLog));
-    *actionLog = (ActionLog){
-        ATTACK,
-        &gameDataEx->gameData->players[attackerCell->owner],
-        &gameDataEx->gameData->players[victimCell->owner],
-        attackPower,
-        attackerCell->entityType,
-        victimCell->entityType,
-        attackerCoord,
-        victimCoord
-    };
-    Stack_push(&gameDataEx->actionLog, actionLog);
     return false;
 }
 
@@ -639,7 +644,7 @@ void printGameBoard(const GameData* gameData) {
 void printTurnInfoBox(const GameDataExtended* gameDataEx) {
     clearTurnInfoBox();
     setCursorVerticalHorizontalPosition(37, 109);
-    const size_t bufSize = snprintf(NULL, 0, "Round %d", gameDataEx->gameData->currentRound + 1) + 1;
+    const int32_t bufSize = snprintf(NULL, 0, "Round %d", gameDataEx->gameData->currentRound + 1) + 1;
     char *roundInfo = malloc(bufSize);
     (void)snprintf(roundInfo, bufSize, "Round %d", gameDataEx->gameData->currentRound + 1);
     drawBoxWithTitleAndFooter(roundInfo, NULL, 26, 9, drawRoundedBox);
@@ -720,9 +725,13 @@ void printActionLog(const GameDataExtended* gameDataEx) {
     clearActionLogBox();
     setCursorVerticalHorizontalPosition(2, 136);
     drawBoxWithTitleAndFooter("Action Log", NULL, 52, 44, drawRoundedBox);
+    if (gameDataEx->actionLog.length > 21) {
+        setCursorVerticalHorizontalPosition(45, 138);
+        printf(" · · · ");
+    }
     uint16_t count = 0;
     const Node *node = gameDataEx->actionLog.top;
-    while (node && count < 20) {
+    while (node && count < 21) {
         const ActionLog *action = node->data;
         setCursorVerticalHorizontalPosition(4 + count * 2, 138);
         setForegroundColor(action->actor->isMordor ? C_MORDOR : C_GONDOR);
@@ -955,7 +964,7 @@ int32_t openCreateBuildingMenu(GameDataExtended* gameDataEx, int32_t currentSele
     const int32_t selection = makeActionMenu(gameDataEx, actionMenu, 4, &currentSelection);
     if (selection == MENU_BACK) return selection;
     const EntityType selectedBuilding = selection + 2;
-    const size_t bufSize = snprintf(NULL, 0, "Build %s...", actionMenu[selection].text) + 1;
+    const int32_t bufSize = snprintf(NULL, 0, "Build %s...", actionMenu[selection].text) + 1;
     char *boxTitle = malloc(bufSize);
     (void)snprintf(boxTitle, bufSize, "Build %s...", actionMenu[selection].text);
     drawActionsMenu(boxTitle, MENU_FOOTER_CANCEL, true);
@@ -1054,7 +1063,7 @@ int32_t openSpawnUnitMenu(GameDataExtended* gameDataEx, int32_t currentSelection
         return currentSelection;
     }
     const EntityType selectedUnit = currentSelection + 6;
-    const size_t bufSize = snprintf(NULL, 0, "Spawn %s...", menuOptions[currentSelection].text) + 1;
+    const int32_t bufSize = snprintf(NULL, 0, "Spawn %s...", menuOptions[currentSelection].text) + 1;
     char *boxTitle = malloc(bufSize);
     (void)snprintf(boxTitle, bufSize, "Spawn %s...", menuOptions[currentSelection].text);
     drawActionsMenu(boxTitle, MENU_FOOTER_CANCEL, true);
@@ -1232,12 +1241,13 @@ int32_t openSelectBuildingMenu(GameDataExtended* gameDataEx) {
         {repairText, repairCost, repairCost == 0, 1, 50},
         {"Demolish", 0, false, 2, 50}
     }, 2, NULL);
+    if (selection == MENU_BACK) return selection;
+    ActionLog *actionLog = malloc(sizeof(ActionLog));
     switch (selection) {
         case 0:
             cell->health = (int16_t)entityInfo.maxHealth;
             gameDataEx->currentPlayer->coins -= repairCost;
-            ActionLog *actionLogRepair = malloc(sizeof(ActionLog));
-            *actionLogRepair = (ActionLog){
+            *actionLog = (ActionLog){
                 REPAIR,
                 gameDataEx->currentPlayer,
                 NULL,
@@ -1247,11 +1257,9 @@ int32_t openSelectBuildingMenu(GameDataExtended* gameDataEx) {
                 *selectedCellCoord,
                 {0, 0}
             };
-            Stack_push(&gameDataEx->actionLog, actionLogRepair);
             break;
         case 1:
-            ActionLog *actionLogDemolish = malloc(sizeof(ActionLog));
-            *actionLogDemolish = (ActionLog){
+            *actionLog = (ActionLog){
                 DEMOLISH,
                 gameDataEx->currentPlayer,
                 NULL,
@@ -1261,7 +1269,6 @@ int32_t openSelectBuildingMenu(GameDataExtended* gameDataEx) {
                 *selectedCellCoord,
                 {0, 0}
             };
-            Stack_push(&gameDataEx->actionLog, actionLogDemolish);
             if (cell->entityType == BASE) {
                 cell->health = 0;
                 processPlayerLoss(gameDataEx->gameData, cell->owner);
@@ -1275,6 +1282,7 @@ int32_t openSelectBuildingMenu(GameDataExtended* gameDataEx) {
             resetBackgroundColor();
             break;
     }
+    Stack_push(&gameDataEx->actionLog, actionLog);
     return selection;
 }
 
@@ -1465,6 +1473,7 @@ void openSelectUnitMenu(GameDataExtended* gameDataEx, Int16Vector2* selectedCell
         (gameDataEx->gameSettings->ENTITIES_MAY_ONLY_ATTACK_ONCE_PER_ROUND && gameDataEx->gameData->board[selectedCellCoord->y][selectedCellCoord->x].hasAttackedThisRound
         ? (ActionMenuOption){"Attack (Already Attacked this Round)", 0, true, 2, 50}
         : enemiesInRange.length > 0
+        // TODO: If ENTITIES_MAY_ONLY_ATTACK_ONCE_PER_ROUND is false, the Attack should have a cost, which could be based on many factors.
         ? (ActionMenuOption){"Attack", 0, false, 2, 50}
         : (ActionMenuOption){"Attack (Not in Range)", 0, true, 2, 50})
     };
@@ -1617,12 +1626,20 @@ void Game(GameData* gameData, const uint8_t saveSlot) {
             currentSelection = 0;
         }
     }
+    // If we get here then the game is over.
+    if (!gameDataEx.actionLog.length) {
+        // If this is empty it's safe to assume that we loaded a game that is already over.
+        refreshCurrentPlayerEntityLists(&gameDataEx);
+    } else {
+        gameDataEx.gameData->elapsedTimeSeconds += time(NULL) - startTime;
+        saveGame(gameDataEx.gameData, saveSlot);
+    }
     printEntityList(&gameDataEx, 0);
+    printTurnInfoBox(&gameDataEx);
     printActionLog(&gameDataEx);
     List_clear(&gameDataEx.currentPlayerBuildingsList);
     List_clear(&gameDataEx.currentPlayerUnitsList);
     Stack_clear(&gameDataEx.actionLog);
-    // If we get here then the game is over.
     const Player *winner = NULL;
     for (uint8_t i = 0; i < gameDataEx.gameData->nPlayers; ++i) {
         if (gameDataEx.gameData->players[i].isAlive) {

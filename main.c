@@ -32,7 +32,7 @@ void printFormattedTime(const uint64_t totalSeconds) {
     const uint64_t seconds = remainingSeconds % 60;
 
     if (hours > 0) {
-        if (minutes == 1) printf("1 hour, ");
+        if (hours == 1) printf("1 hour, ");
         else printf("%llu hours, ", hours);
     }
     if (hours > 0 || minutes > 0) {
@@ -46,7 +46,7 @@ void printFormattedTime(const uint64_t totalSeconds) {
 int16_t openMainMenu(int16_t currentSelection);
 
 inline void printTitle(void) {
-    const char* asciiArt[] = {
+    const char *asciiArt[] = {
         "        ___     _________________________________               ",
         "      //  //  //   ___    //\\\\_____    _____\\__  \\\\        ",
         "     //  //  //   /  /   //       \\\\   \\   \\   \\  \\\\     ",
@@ -76,28 +76,37 @@ uint32_t loadMapList(char*** mapList) {
     *mapList = malloc(mapCount * sizeof(char*));
     for (uint32_t i = 0; i < mapCount; ++i) {
         char *mapName = fReadLine(fp);
-        char* mapFileName = malloc(10 + strlen(mapName));
-        (void)sprintf(mapFileName, "Maps\\%s.map", mapName);
-        FILE *mapFile = fopen(mapFileName, "r");
-        free(mapFileName);
-        if (mapFile == NULL) {
-            // If we got here, then the map file does not exist.
-            free(mapName);
-            --mapCount;
-            --i;
-            continue;
+        const int32_t bufSize = snprintf(NULL, 0, "Maps\\%s.map", mapName) + 1;
+        char *mapFileName = malloc(bufSize);
+        if (mapFileName != NULL) {
+            const int32_t mFileNameLen = snprintf(mapFileName, bufSize, "Maps\\%s.map", mapName);
+            if (!(mFileNameLen < 0 || mFileNameLen >= bufSize)) {
+                FILE *mapFile = fopen(mapFileName, "r");
+                free(mapFileName);
+                if (mapFile != NULL) {
+                    (void)fclose(mapFile);
+                    (*mapList)[i] = mapName;
+                    continue;
+                }
+            }
         }
-        (void)fclose(mapFile);
-        (*mapList)[i] = mapName;
+        // If we got here, then the map file does not exist or an error occurred.
+        free(mapName);
+        --mapCount;
+        --i;
     }
     (void)fclose(fp);
+    if (!mapCount) free(*mapList);
     return mapCount;
 }
 
 void drawMapPreview(const char* mapName, const uint16_t row, const uint16_t column) {
     setCursorVerticalHorizontalPosition(row, column);
-    char* mapFileName = malloc(10 + strlen(mapName));
-    (void)sprintf(mapFileName, "Maps\\%s.map", mapName);
+    const int32_t bufSize = snprintf(NULL, 0, "Maps\\%s.map", mapName) + 1;
+    char *mapFileName = malloc(bufSize);
+    if (mapFileName == NULL) return;
+    const int32_t mFileNameLen = snprintf(mapFileName, bufSize, "Maps\\%s.map", mapName);
+    if (mFileNameLen < 0 || mFileNameLen >= bufSize) return;
     FILE *fp = fopen(mapFileName, "r");
     if (fp == NULL) return;
     int ch;
@@ -105,22 +114,20 @@ void drawMapPreview(const char* mapName, const uint16_t row, const uint16_t colu
     uint8_t player = 0;
     setForegroundColor(BLACK);
     while ((ch = fgetc(fp)) != EOF) {
-        if (ch == '\n') {
-            setCursorVerticalHorizontalPosition(++r + row, column);
-            continue;
-        }
         switch (ch) {
-            case 'P': setBackgroundColor(C_PLAIN);        break;
-            case 'F': setBackgroundColor(C_FOREST);       break;
-            case 'M': setBackgroundColor(C_MOUNTAIN);     break;
-            case 'R': setBackgroundColor(C_RIVER);        break;
-            case 'W': setBackgroundColor(C_WATER);        break;
-            case 'B': setBackgroundColor(C_BRIDGE);       break;
-            case 'S': setBackgroundColor(C_SNOW);         break;
-            case 'L': setBackgroundColor(C_LAVA);         break;
-            case 'T': setBackgroundColor(C_BASALT);       break;
-            case '#': printf("\b\bP%d", ++player); continue;
-            default:  resetBackgroundColor();             break;
+            case '\r': continue;
+            case '\n': setCursorVerticalHorizontalPosition(++r + row, column); continue;
+            case 'P' : setBackgroundColor(C_PLAIN);        break;
+            case 'F' : setBackgroundColor(C_FOREST);       break;
+            case 'M' : setBackgroundColor(C_MOUNTAIN);     break;
+            case 'R' : setBackgroundColor(C_RIVER);        break;
+            case 'W' : setBackgroundColor(C_WATER);        break;
+            case 'B' : setBackgroundColor(C_BRIDGE);       break;
+            case 'S' : setBackgroundColor(C_SNOW);         break;
+            case 'L' : setBackgroundColor(C_LAVA);         break;
+            case 'T' : setBackgroundColor(C_BASALT);       break;
+            case '#' : printf("\b\bP%d", ++player); continue;
+            default  : resetBackgroundColor();             break;
         }
         printf("  ");
     }
@@ -183,8 +190,9 @@ char* openMapSelector(void) {
             setForegroundColor(RED);
         } while (ch != KEY_ENTER && ch != KEY_SPACE);
     }
-    char* chosenMapFile = malloc(10 + strlen(mapList[currentSelection]));
-    (void)sprintf(chosenMapFile, "Maps\\%s.map", mapList[currentSelection]);
+    const int32_t bufSize = snprintf(NULL, 0, "Maps\\%s.map", mapList[currentSelection]) + 1;
+    char *chosenMapFile = malloc(bufSize);
+    (void)snprintf(chosenMapFile, bufSize, "Maps\\%s.map", mapList[currentSelection]);
     for (uint32_t i = 0; i < mapCount; ++i) {
         free(mapList[i]);
     }
@@ -208,7 +216,7 @@ void openGameSetupSinglePlayer(const uint8_t selectedSaveSlot) {
     setForegroundColor(WHITE);
     readLine(playerName, 20, false);
     hideCursor();
-    char* chosenMapFile = openMapSelector();
+    char *chosenMapFile = openMapSelector();
     startNewSinglePlayerGame(selectedSaveSlot, chosenMapFile, playerName, false);    
 }
 
@@ -233,7 +241,7 @@ void openGameSetupMultiPlayer(const uint8_t selectedSaveSlot) {
     setForegroundColor(WHITE);
     readLine(player2Name, 21, false);
     hideCursor();
-    char* chosenMapFile = openMapSelector();
+    char *chosenMapFile = openMapSelector();
     startNewMultiplayerGame(selectedSaveSlot, chosenMapFile, player1Name, player2Name, false);    
 }
 
@@ -293,7 +301,7 @@ void drawSaveSlotBlock_NewGame(const uint8_t slotId, const bool selected, const 
         printf("%s vs. %s", gameData->players[0].name, gameData->players[1].name);
         const Date lastSaveDate = getDate(gameData->lastSaveTimestamp);
         setCursorVerticalHorizontalPosition(row, column + 36);
-        printf(" %d/%d/%d ", lastSaveDate.day, lastSaveDate.month, lastSaveDate.year);
+        printf(" %02d/%02d/%d ", lastSaveDate.day, lastSaveDate.month, lastSaveDate.year);
         setCursorVerticalHorizontalPosition(row + 3, column + 3);
         setForegroundColor(selected ? RED : DARK_GRAY);
         printf("Overwrite Save Game");
@@ -318,7 +326,7 @@ bool drawSaveSlotBlock_LoadGame(const uint8_t slotId, const bool selected, const
         printf("%s vs. %s", gameData->players[0].name, gameData->players[1].name);
         const Date lastSaveDate = getDate(gameData->lastSaveTimestamp);
         setCursorVerticalHorizontalPosition(row, column + 36);
-        printf(" %d/%d/%d ", lastSaveDate.day, lastSaveDate.month, lastSaveDate.year);
+        printf(" %02d/%02d/%d ", lastSaveDate.day, lastSaveDate.month, lastSaveDate.year);
         setCursorVerticalHorizontalPosition(row + 3, column + 3);
         printf("Game Time: ");
         printFormattedTime(gameData->elapsedTimeSeconds);
@@ -466,19 +474,9 @@ int main(void) {
     if (!setupConsole("The Battle for Middle-Earth")) {
         hideCursor();
         // If we get here we must have failed to resize the console window. We'll ask the user to resize it.
-        const HANDLE hConsoleOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        if (hConsoleOut != INVALID_HANDLE_VALUE) {
-            const COORD maxWindowSize = GetLargestConsoleWindowSize(hConsoleOut);
-            if (maxWindowSize.Y < 46 || maxWindowSize.X < 135) {
-                printCenteredText("Your screen size is unsupported.");
-                printCenteredText("Exiting game...");
-                Sleep(5000);
-                exit(0);
-            }
-        }
         enforceConsoleResize(
             "Welcome to The Battle for Middle-Earth",
-            "Please increase the window size for a better experience.",
+            "Please increase the window size and/or reduce the font size to continue.",
             135,
             46
         );
