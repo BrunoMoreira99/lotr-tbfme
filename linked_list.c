@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "linked_list.h"
+#include "collections.h"
 
 List List_init(int (*compareFunction)(const void*, const void*)) {
     List new_list;

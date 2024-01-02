@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 #include "math_utils.h"
-#include "linked_list.h"
+#include "collections.h"
 
 #define NO_OWNER _UI8_MAX // 255 / 0xFF
 
@@ -48,7 +48,7 @@ typedef enum {
 
 typedef struct {
     uint8_t id;
-    char name[20];
+    char name[21];
     int32_t coins;
     bool isMordor;
     bool isAlive;
@@ -82,6 +82,26 @@ typedef struct {
     uint16_t moveCost;
     uint16_t attackPower;
 } EntityInfo;
+
+typedef enum {
+    BUILD,
+    SPAWN,
+    MOVE,
+    ATTACK,
+    REPAIR,
+    DEMOLISH
+} ActionType;
+
+typedef struct {
+    ActionType type;
+    Player* actor;
+    Player* target;
+    uint16_t damageDealt;
+    EntityType actorEntityType;
+    EntityType targetEntityType;
+    Int16Vector2 actorCoord;
+    Int16Vector2 targetCoord;
+} ActionLog;
 
 typedef struct {
     uint16_t MINE_INCOME;
@@ -123,6 +143,7 @@ typedef struct {
     Int16Vector2 currentPlayerBaseCoord;
     List currentPlayerBuildingsList;
     List currentPlayerUnitsList;
+    Stack actionLog;
     GameSettings* gameSettings;
 } GameDataExtended;
 

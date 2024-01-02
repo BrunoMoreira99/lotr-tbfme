@@ -219,16 +219,16 @@ void openGameSetupMultiPlayer(const uint8_t selectedSaveSlot) {
         printf("┃");
     }
     showCursor();
-    char player1Name[20], player2Name[20];
+    char player1Name[21], player2Name[21];
     setCursorVerticalHorizontalPosition(5, 4);
     printf("Player 1 Name: ");
     setForegroundColor(WHITE);
-    readLine(player1Name, 20, false);
+    readLine(player1Name, 21, false);
     setCursorVerticalHorizontalPosition(6, 4);
     setForegroundColor(RED);
     printf("Player 2 Name: ");
     setForegroundColor(WHITE);
-    readLine(player2Name, 20, false);
+    readLine(player2Name, 21, false);
     hideCursor();
     char* chosenMapFile = openMapSelector();
     startNewMultiplayerGame(selectedSaveSlot, chosenMapFile, player1Name, player2Name, false);    

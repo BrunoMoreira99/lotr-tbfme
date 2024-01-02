@@ -84,6 +84,13 @@ void clearEntityListBox(void) {
     }
 }
 
+void clearActionLogBox(void) {
+    for (uint16_t i = 0; i < 33; ++i) {
+        setCursorVerticalHorizontalPosition(3 + i, 137);
+        clearFromCursorForward(50);
+    }
+}
+
 void clearTurnInfoBox(void) {
     for (uint16_t i = 0; i < 7; ++i) {
         setCursorVerticalHorizontalPosition(38 + i, 109);
@@ -526,26 +533,38 @@ void processPlayerLoss(GameData* gameData, const uint8_t playerId) {
 /**
  * @return True if the attacked entity was destroyed, False if otherwise.
  */
-bool performAttack(GameData* gameData, const Int16Vector2 attackerCoord, const Int16Vector2 victimCoord) {
-    GameBoardCell *attackerCell = &gameData->board[attackerCoord.y][attackerCoord.x];
+bool performAttack(GameDataExtended* gameDataEx, const Int16Vector2 attackerCoord, const Int16Vector2 victimCoord) {
+    GameBoardCell *attackerCell = &gameDataEx->gameData->board[attackerCoord.y][attackerCoord.x];
     const uint8_t attackerRange = attackerCell->entityType == ARTILLERY ? 3 : 1;
     if (getChebyshevDistance(attackerCoord, victimCoord) > attackerRange) return false;
     attackerCell->hasAttackedThisRound = true;
-    GameBoardCell *victimCell = &gameData->board[victimCoord.y][victimCoord.x];
-    const uint16_t attackPower = getAttackPower(gameData, attackerCoord, victimCoord);
+    GameBoardCell *victimCell = &gameDataEx->gameData->board[victimCoord.y][victimCoord.x];
+    const uint16_t attackPower = getAttackPower(gameDataEx->gameData, attackerCoord, victimCoord);
     if (victimCell->health <= attackPower) {
         if (victimCell->entityType == BASE) {
             victimCell->health = 0;
-            processPlayerLoss(gameData, victimCell->owner);
+            processPlayerLoss(gameDataEx->gameData, victimCell->owner);
         } else {
             *victimCell = (GameBoardCell){victimCell->terrainType, EMPTY_CELL, NO_OWNER, 0, false};
             setCursorAtCellCoord(victimCoord);
-            printGameCell(gameData, victimCell, false);
+            printGameCell(gameDataEx->gameData, victimCell, false);
             resetBackgroundColor();
         }
         return true;
     }
     victimCell->health = (int16_t)(victimCell->health - attackPower);
+    ActionLog *actionLog = malloc(sizeof(ActionLog));
+    *actionLog = (ActionLog){
+        ATTACK,
+        &gameDataEx->gameData->players[attackerCell->owner],
+        &gameDataEx->gameData->players[victimCell->owner],
+        attackPower,
+        attackerCell->entityType,
+        victimCell->entityType,
+        attackerCoord,
+        victimCoord
+    };
+    Stack_push(&gameDataEx->actionLog, actionLog);
     return false;
 }
 
@@ -693,6 +712,92 @@ void printEntityList(const GameDataExtended* gameDataEx, const uint8_t mode) {
     if (count > 16) {
         setCursorVerticalHorizontalPosition(36, 126);
         printf(" · · · ");
+    }
+}
+
+void printActionLog(const GameDataExtended* gameDataEx) {
+    if (getConsoleWidth() < 188) return;
+    clearActionLogBox();
+    setCursorVerticalHorizontalPosition(2, 136);
+    drawBoxWithTitleAndFooter("Action Log", NULL, 52, 44, drawRoundedBox);
+    uint16_t count = 0;
+    const Node *node = gameDataEx->actionLog.top;
+    while (node && count < 20) {
+        const ActionLog *action = node->data;
+        setCursorVerticalHorizontalPosition(4 + count * 2, 138);
+        setForegroundColor(action->actor->isMordor ? C_MORDOR : C_GONDOR);
+        printf("[P%d] ", action->actor->id + 1);
+        resetForegroundColor();
+        switch (action->type) {
+            case BUILD:
+                printf("built ");
+                setForegroundColor(WHITE);
+                printf("%s ", getEntityName(action->actorEntityType, action->actor->isMordor));
+                resetForegroundColor();
+                printf("at ");
+                setForegroundColor(WHITE);
+                printf("%c-%d", 'A' + action->actorCoord.x, action->actorCoord.y);
+                resetForegroundColor();
+                break;
+            case SPAWN:
+                printf("spawned ");
+                setForegroundColor(WHITE);
+                printf("%s ", getEntityName(action->actorEntityType, action->actor->isMordor));
+                resetForegroundColor();
+                printf("at ");
+                setForegroundColor(WHITE);
+                printf("%c-%d", 'A' + action->actorCoord.x, action->actorCoord.y);
+                resetForegroundColor();
+                break;
+            case MOVE:
+                printf("moved ");
+                setForegroundColor(WHITE);
+                printf("%s ", getEntityName(action->actorEntityType, action->actor->isMordor));
+                resetForegroundColor();
+                printf("from ");
+                setForegroundColor(WHITE);
+                printf("%c-%d ", 'A' + action->actorCoord.x, action->actorCoord.y);
+                resetForegroundColor();
+                printf("to ");
+                setForegroundColor(WHITE);
+                printf("%c-%d", 'A' + action->targetCoord.x, action->targetCoord.y);
+                resetForegroundColor();
+                break;
+            case ATTACK:
+                printf("dealt ");
+                setForegroundColor(RED);
+                printf("%d ", action->damageDealt);
+                resetForegroundColor();
+                printf("DMG to ");
+                setForegroundColor(action->target->isMordor ? C_MORDOR : C_GONDOR);
+                printf("[P%d] ", action->target->id + 1);
+                setForegroundColor(WHITE);
+                printf("%s (%c-%d) ", getEntityName(action->targetEntityType, action->target->isMordor), 'A' + action->targetCoord.x, action->targetCoord.y);
+                resetForegroundColor();
+                break;
+            case REPAIR:
+                printf("repaired ");
+                setForegroundColor(WHITE);
+                printf("%s ", getEntityName(action->actorEntityType, action->actor->isMordor));
+                resetForegroundColor();
+                printf("at ");
+                setForegroundColor(WHITE);
+                printf("%c-%d", 'A' + action->actorCoord.x, action->actorCoord.y);
+                resetForegroundColor();
+                break;
+            case DEMOLISH:
+                printf("demolished ");
+                setForegroundColor(WHITE);
+                printf("%s ", getEntityName(action->actorEntityType, action->actor->isMordor));
+                resetForegroundColor();
+                printf("at ");
+                setForegroundColor(WHITE);
+                printf("%c-%d", 'A' + action->actorCoord.x, action->actorCoord.y);
+                resetForegroundColor();
+                break;
+        }
+        node = node->next;
+        ++count;
     }
 }
 
@@ -867,6 +972,18 @@ int32_t openCreateBuildingMenu(GameDataExtended* gameDataEx, int32_t currentSele
     setCursorAtCellCoord(selectedCellCoord);
     printGameCell(gameDataEx->gameData, selectedCell, false);
     resetBackgroundColor();
+    ActionLog *actionLog = malloc(sizeof(ActionLog));
+    *actionLog = (ActionLog){
+        BUILD,
+        gameDataEx->currentPlayer,
+        NULL,
+        0,
+        selectedBuilding,
+        EMPTY_CELL,
+        selectedCellCoord,
+        {0, 0}
+    };
+    Stack_push(&gameDataEx->actionLog, actionLog);
     return selection;
 }
 
@@ -956,6 +1073,18 @@ int32_t openSpawnUnitMenu(GameDataExtended* gameDataEx, int32_t currentSelection
     setCursorAtCellCoord(selectedCellCoord);
     printGameCell(gameDataEx->gameData, selectedCell, false);
     resetBackgroundColor();
+    ActionLog *actionLog = malloc(sizeof(ActionLog));
+    *actionLog = (ActionLog){
+        SPAWN,
+        gameDataEx->currentPlayer,
+        NULL,
+        0,
+        selectedUnit,
+        EMPTY_CELL,
+        selectedCellCoord,
+        {0, 0}
+    };
+    Stack_push(&gameDataEx->actionLog, actionLog);
     return currentSelection;
 }
 
@@ -1079,7 +1208,7 @@ Int16Vector2* makeEntitySelection(const GameDataExtended* gameDataEx, const bool
     return selectedCellCoord;
 }
 
-int32_t openSelectBuildingMenu(const GameDataExtended* gameDataEx) {
+int32_t openSelectBuildingMenu(GameDataExtended* gameDataEx) {
     const Int16Vector2 *selectedCellCoord = makeEntitySelection(gameDataEx, false);
     if (selectedCellCoord == NULL) return MENU_BACK;
     GameBoardCell *cell = &gameDataEx->gameData->board[selectedCellCoord->y][selectedCellCoord->x];
@@ -1101,14 +1230,38 @@ int32_t openSelectBuildingMenu(const GameDataExtended* gameDataEx) {
     }
     const int32_t selection = makeActionMenu(gameDataEx, (ActionMenuOption[]){
         {repairText, repairCost, repairCost == 0, 1, 50},
-        {"Destroy", 0, false, 2, 50}
+        {"Demolish", 0, false, 2, 50}
     }, 2, NULL);
     switch (selection) {
         case 0:
             cell->health = (int16_t)entityInfo.maxHealth;
             gameDataEx->currentPlayer->coins -= repairCost;
+            ActionLog *actionLogRepair = malloc(sizeof(ActionLog));
+            *actionLogRepair = (ActionLog){
+                REPAIR,
+                gameDataEx->currentPlayer,
+                NULL,
+                0,
+                cell->entityType,
+                EMPTY_CELL,
+                *selectedCellCoord,
+                {0, 0}
+            };
+            Stack_push(&gameDataEx->actionLog, actionLogRepair);
             break;
         case 1:
+            ActionLog *actionLogDemolish = malloc(sizeof(ActionLog));
+            *actionLogDemolish = (ActionLog){
+                DEMOLISH,
+                gameDataEx->currentPlayer,
+                NULL,
+                0,
+                cell->entityType,
+                EMPTY_CELL,
+                *selectedCellCoord,
+                {0, 0}
+            };
+            Stack_push(&gameDataEx->actionLog, actionLogDemolish);
             if (cell->entityType == BASE) {
                 cell->health = 0;
                 processPlayerLoss(gameDataEx->gameData, cell->owner);
@@ -1236,7 +1389,7 @@ uint8_t enterMoveUnitMode(const GameDataExtended* gameDataEx, Int16Vector2* unit
     return 2;
 }
 
-bool enterAttackMode(const GameDataExtended* gameDataEx, const Int16Vector2* unitCoord, const List enemiesInRange) {
+bool enterAttackMode(GameDataExtended* gameDataEx, const Int16Vector2* unitCoord, const List enemiesInRange) {
     drawActionsMenu("Attack...", MENU_FOOTER_CANCEL, false);
     setCursorVerticalHorizontalPosition(44, 58);
     printf("Press [↑]/[↓] to cycle through enemies in range");
@@ -1285,7 +1438,7 @@ bool enterAttackMode(const GameDataExtended* gameDataEx, const Int16Vector2* uni
         resetBackgroundColor();
         if (ch == KEY_ESC) return false;
     } while (ch != KEY_ENTER && ch != KEY_SPACE);
-    performAttack(gameDataEx->gameData, *unitCoord, *selectedCellCoord);
+    performAttack(gameDataEx, *unitCoord, *selectedCellCoord);
     return true;
 }
 
@@ -1326,6 +1479,7 @@ void openSelectUnitMenu(GameDataExtended* gameDataEx, Int16Vector2* selectedCell
     setCursorVerticalHorizontalPosition(42, 50);
     clearFromCursorForward(57);
     if (selection == 0) {
+        const Int16Vector2 originalCellCoord = *selectedCellCoord;
         do {
             const uint8_t moveResult = enterMoveUnitMode(gameDataEx, selectedCellCoord, validCellsToMoveTo);
             if (moveResult != 2) break;
@@ -1335,8 +1489,25 @@ void openSelectUnitMenu(GameDataExtended* gameDataEx, Int16Vector2* selectedCell
             printEntityList(gameDataEx, 2);
             printTurnInfoBox(gameDataEx);
         } while (validCellsToMoveTo.length && gameDataEx->currentPlayer->coins > 0);
+        if (compareInt16Vector2(&originalCellCoord, selectedCellCoord) != 0) {
+            ActionLog *actionLog = malloc(sizeof(ActionLog));
+            *actionLog = (ActionLog){
+                MOVE,
+                gameDataEx->currentPlayer,
+                NULL,
+                0,
+                gameDataEx->gameData->board[selectedCellCoord->y][selectedCellCoord->x].entityType,
+                EMPTY_CELL,
+                originalCellCoord,
+                *selectedCellCoord
+            };
+            Stack_push(&gameDataEx->actionLog, actionLog);
+            printActionLog(gameDataEx);
+        }
     } else {
-        enterAttackMode(gameDataEx, selectedCellCoord, enemiesInRange);
+        if (enterAttackMode(gameDataEx, selectedCellCoord, enemiesInRange)) {
+            printActionLog(gameDataEx);
+        }
     }
     List_clear(&validCellsToMoveTo);
     List_clear(&enemiesInRange);
@@ -1365,6 +1536,7 @@ void Game(GameData* gameData, const uint8_t saveSlot) {
         {0, 0},
         createInt16Vector2List(),
         createInt16Vector2List(),
+        Stack_init(),
         getGameSettings()
     };
     int32_t currentSelection = 0;
@@ -1380,11 +1552,13 @@ void Game(GameData* gameData, const uint8_t saveSlot) {
         }
         printEntityList(&gameDataEx, 0);
         printTurnInfoBox(&gameDataEx);
+        printActionLog(&gameDataEx);
         while (true) {
             if (enforceConsoleResize(NULL, NULL, 135, 46)) {
                 printGameBoard(gameDataEx.gameData);
                 printEntityList(&gameDataEx, 0);
                 printTurnInfoBox(&gameDataEx);
+                printActionLog(&gameDataEx);
             }
             const int32_t action = openMainActionsMenu(&gameDataEx, &currentSelection);
             if (action == 0) {
@@ -1444,8 +1618,10 @@ void Game(GameData* gameData, const uint8_t saveSlot) {
         }
     }
     printEntityList(&gameDataEx, 0);
+    printActionLog(&gameDataEx);
     List_clear(&gameDataEx.currentPlayerBuildingsList);
     List_clear(&gameDataEx.currentPlayerUnitsList);
+    Stack_clear(&gameDataEx.actionLog);
     // If we get here then the game is over.
     const Player *winner = NULL;
     for (uint8_t i = 0; i < gameDataEx.gameData->nPlayers; ++i) {
