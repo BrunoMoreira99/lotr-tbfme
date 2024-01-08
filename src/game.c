@@ -203,7 +203,7 @@ const char* getEntityName(const EntityType entityType, const bool ownerIsMordor)
 }
 
 EntityInfo getEntityInfo(const EntityType entityType) {
-    const GameSettings* gameSettings = getGameSettings();
+    const GameSettings *gameSettings = getGameSettings();
     switch (entityType) {
         case BASE:
             return (EntityInfo){
